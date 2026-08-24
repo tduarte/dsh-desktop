@@ -114,8 +114,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y flatpak flatpak-builder ostree
-          flatpak --user remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-          flatpak --user -y install flathub org.electronjs.Electron2.BaseApp//24.08
+          sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          # Install the Electron BaseApp runtime system-wide: flatpak-builder
+          # defaults to /var/lib/flatpak for runtimes even with --user, so we
+          # must put the runtime there. The app itself remains in --user.
+          sudo flatpak install -y flathub org.electronjs.Electron2.BaseApp//24.08
 
       - run: pnpm install --frozen-lockfile
       - name: Download Electron binary
