@@ -28,13 +28,13 @@ flatpak install --user flathub org.electronjs.Electron2.BaseApp//24.08
 flatpak install --user --bundle <path-to>/DeepSeek-Harness-<version>.flatpak
 
 # run it
-flatpak run ai.deepseek.harness.desktop
+flatpak run io.github.tduarte.dsh-desktop
 ```
 
 Update:
 
 ```sh
-flatpak update ai.deepseek.harness.desktop
+flatpak update io.github.tduarte.dsh-desktop
 ```
 
 ## Development

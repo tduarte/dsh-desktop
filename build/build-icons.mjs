@@ -30,9 +30,10 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import sharp from 'sharp'
 import process from 'node:process'
+import { fileURLToPath } from 'node:url'
 import { dirname, join, resolve } from 'node:path'
 
-const repoRoot = resolve(dirname(new URL(import.meta.url).pathname), '..')
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const svgPath = join(repoRoot, 'dsh-desktop.icon', 'Assets', 'deepseek.svg')
 const buildDir = join(repoRoot, 'build')
 

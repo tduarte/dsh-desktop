@@ -1,30 +1,20 @@
-# Build and publish DeepSeek Harness desktop installers.
-#
-# Triggers:
-#   - pull_request, push (master): matrix build, smoke test, upload as artifacts
-#   - tag v*: matrix build + create/update GitHub Release with installers + flatpak repo
-#
-# Matrix: macOS (.dmg), Windows (.exe), Linux (.flatpak + OSTree repo).
-# No code signing in this PR.
-
 name: Desktop
 
 on:
-  push:
-    branches: [master]
-    tags: ['v*']
   pull_request:
-  workflow_dispatch:
-
-permissions:
-  contents: write
+    branches: [main]
+    paths:
+      - '.github/workflows/desktop.yml'
+      - 'apps/desktop/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
 
 env:
   NODE_VERSION: '22'
-  # electron-builder's nodeModulesCollector scans every transitive dep and
-  # OOMs on large workspaces. Bump the heap so macOS / Windows packaging
-  # survives the harness's ~200-package transitive closure.
-  NODE_OPTIONS: '--max-old-space-size=8192'
+
+concurrency:
+  group: desktop-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   typecheck-test:
@@ -55,15 +45,23 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
       - run: pnpm install --frozen-lockfile
+      - name: Download Electron binary
+        # electron's package.json exposes no install script — pnpm 10 won't
+        # auto-invoke it. We must run install.js ourselves to download the
+        # platform binary into node_modules/electron/dist/.
+        run: node node_modules/electron/install.js
       - run: pnpm run build
       - run: pnpm run icon:build
-      - run: pnpm run dist:mac
+      - name: Build macOS .app
+        # Manual pack bypasses electron-builder's OOMing nodeModulesCollector.
+        # Produces dist/DeepSeek Harness.app without invoking electron-builder.
+        run: pnpm run dist:mac
       - uses: actions/upload-artifact@v4
         with:
           name: dsh-desktop-mac
           path: |
+            dist/DeepSeek Harness.app
             dist/*.dmg
-            dist/*.zip
             dist/latest-mac.yml
           if-no-files-found: error
           retention-days: 14
@@ -81,109 +79,23 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
       - run: pnpm install --frozen-lockfile
+      - name: Download Electron binary
+        # electron's package.json exposes no install script — pnpm 10 won't
+        # auto-invoke it. We must run install.js ourselves to download the
+        # platform binary into node_modules/electron/dist/.
+        run: node node_modules/electron/install.js
       - run: pnpm run build
       - run: pnpm run icon:build
-      - run: pnpm run dist:win
+      - name: Build Windows directory
+        shell: pwsh
+        run: pnpm run dist:win
       - uses: actions/upload-artifact@v4
         with:
           name: dsh-desktop-win
           path: |
-            dist/*.exe
-            dist/latest.yml
+            dist/DeepSeek-Harness-*-win-x64/**
           if-no-files-found: error
           retention-days: 14
 
   build-linux:
     name: Build Linux (.flatpak)
-    runs-on: ubuntu-22.04
-    needs: typecheck-test
-    steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v4
-        with:
-          dest: ${{ runner.temp }}/setup-pnpm
-      - uses: actions/setup-node@v6
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Install Flatpak + Flathub remote
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y flatpak flatpak-builder
-          flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-          flatpak install --user flathub org.electronjs.Electron2.BaseApp//24.08
-
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run build
-      - run: pnpm run icon:build
-      # `dist:linux` produces the Electron archive at
-      # `dist/DeepSeek-Harness-<version>-linux-x64.tar.gz`. The Flatpak build
-      # reads it, computes sha512 + size, and substitutes them into the
-      # manifest before invoking `flatpak-builder`.
-      - run: pnpm run dist:linux
-      - run: pnpm run flatpak:build
-
-      - name: Verify .flatpak structure
-        run: |
-          test -f build/flatpak-out/DeepSeek-Harness-*.flatpak
-          test -f build/flatpak-out/repo.tar.gz
-          # Smoke-test: install to a throwaway user prefix and confirm the
-          # entry resolves; we don't run the GUI here (CI has no display).
-          flatpak --user install --bundle build/flatpak-out/DeepSeek-Harness-*.flatpak ai.deepseek.harness.desktop || true
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: dsh-desktop-linux
-          path: |
-            build/flatpak-out/*.flatpak
-            build/flatpak-out/repo.tar.gz
-            dist/*.tar.gz
-            dist/latest-linux.yml
-          if-no-files-found: error
-          retention-days: 14
-
-  release:
-    name: Publish GitHub Release
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build-mac, build-win, build-linux]
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/download-artifact@v4
-        with:
-          name: dsh-desktop-mac
-          path: artifacts/mac
-      - uses: actions/download-artifact@v4
-        with:
-          name: dsh-desktop-win
-          path: artifacts/win
-      - uses: actions/download-artifact@v4
-        with:
-          name: dsh-desktop-linux
-          path: artifacts/linux
-
-      - name: Flatten artifacts for upload
-        run: |
-          mkdir -p dist
-          find artifacts/mac -name '*.dmg' -exec cp {} dist/ \;
-          find artifacts/mac -name 'latest-mac.yml' -exec cp {} dist/ \; || true
-          find artifacts/win -name '*.exe' -exec cp {} dist/ \;
-          find artifacts/win -name 'latest.yml' -exec cp {} dist/ \; || true
-          find artifacts/linux -name '*.flatpak' -exec cp {} dist/ \;
-          find artifacts/linux -name 'repo.tar.gz' -exec cp {} dist/ \; || true
-          find artifacts/linux -name 'latest-linux.yml' -exec cp {} dist/ \; || true
-          ls -la dist/
-
-      - uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          generate_release_notes: true
-          files: |
-            dist/*.dmg
-            dist/*.exe
-            dist/*.flatpak
-            dist/repo.tar.gz
-            dist/latest.yml
-            dist/latest-mac.yml
-            dist/latest-linux.yml
-          fail_on_unmatched_files: false

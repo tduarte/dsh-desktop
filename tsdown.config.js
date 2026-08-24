@@ -11,7 +11,8 @@ const mainConfig = defineConfig({
   clean: true,
   sourcemap: true,
   dts: false,
-  external: ['electron', 'electron-updater', /^app-builder-lib/, /^builder-util/, /^dmg-builder/, /^electron-builder/],
+  external: ['electron'],
+  noExternal: [/^(electron-updater|builder-util|builder-util-runtime|app-builder-lib|dmg-builder|electron-builder|js-yaml|lazy-val|semver|lodash\..*)$/],
 })
 
 const preloadConfig = defineConfig({
