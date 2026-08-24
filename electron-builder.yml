@@ -12,6 +12,15 @@ appId: ai.deepseek.harness.desktop
 productName: DeepSeek Harness
 copyright: Copyright © 2026 DeepSeek
 asar: true
+# Disable electron-builder's nodeModuleCollector; it walks the entire
+# `node_modules/` tree at build time to assemble a production-only
+# dependency graph, and OOMs on CI runners where ~865 packages x native
+# binaries pushes the V8 heap past the 8 GB default. Our package.json
+# already declares a minimal runtime closure via dependencies; ASAR
+# bundles everything in `files` as-is and we ship extraResources/dsh/
+# (the entire staged tree) outside the asar. Concretely: zero benefit
+# from running the collector, real cost in cold-cache + cold-node.
+nodeModuleCollector: false
 directories:
   output: dist
   buildResources: build
