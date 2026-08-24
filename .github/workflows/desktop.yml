@@ -24,7 +24,7 @@ env:
   # electron-builder's nodeModulesCollector scans every transitive dep and
   # OOMs on large workspaces. Bump the heap so macOS / Windows packaging
   # survives the harness's ~200-package transitive closure.
-  NODE_OPTIONS: '--max-old-space-size=8192'
+  NODE_OPTIONS: '--max-old-space-size=12288'
 
 jobs:
   typecheck-test:
