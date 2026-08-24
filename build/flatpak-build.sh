@@ -76,6 +76,7 @@ sed \
 
 echo "flatpak: flatpak-builder..."
 flatpak-builder --force-clean \
+  --install-deps-from=flathub \
   --repo="${FLATPAK_REPO}" \
   "${FLATPAK_BUILD_DIR}" \
   "${MANIFEST_RENDERED}"
