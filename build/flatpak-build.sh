@@ -34,7 +34,7 @@ FLATPAK_REPO="${FLATPAK_REPO:-${OUT_DIR}/repo}"
 FLATPAK_BUILD_DIR="${FLATPAK_BUILD_DIR:-${OUT_DIR}/build}"
 FLATPAK_BUNDLE="${FLATPAK_BUNDLE:-${OUT_DIR}/DeepSeek-Harness-${VERSION}.flatpak}"
 MANIFEST_SRC="${REPO_ROOT}/flatpak/${APP_ID}.yml"
-MANIFEST_RENDERED="${FLATPAK_BUILD_DIR}/${APP_ID}.rendered.yml"
+MANIFEST_RENDERED="${REPO_ROOT}/flatpak/${APP_ID}.rendered.yml"
 
 echo "flatpak: version=${VERSION}"
 echo "flatpak: tarball=${TARBALL}"

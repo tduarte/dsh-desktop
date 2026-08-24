@@ -18,7 +18,7 @@
  *       dist/                         (frontend Vite output)
  */
 
-import { cp, mkdir, rm, stat } from 'node:fs/promises'
+import { cp, mkdir, readFile, rm, stat } from 'node:fs/promises'
 import { chmod, existsSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -31,7 +31,7 @@ const electronAppSource = join(repoRoot, 'node_modules', 'electron', 'dist', 'El
 const libSource = join(repoRoot, 'lib')
 const stageDshSource = join(repoRoot, 'build', 'stage', 'dsh')
 const stageDistSource = join(repoRoot, 'build', 'stage', 'dist')
-const { version } = (await import(join(repoRoot, 'package.json'), { with: { type: 'json' } })).default
+const { version } = JSON.parse(await readFile(join(repoRoot, 'package.json'), 'utf8'))
 
 function fail(message) {
   process.stderr.write(`pack-mac: ${message}\n`)
