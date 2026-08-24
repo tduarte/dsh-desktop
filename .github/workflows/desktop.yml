@@ -11,6 +11,7 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 env:
   NODE_VERSION: '22'
@@ -102,12 +103,13 @@ jobs:
 
   release:
     name: Publish GitHub Release
-    # Runs on tag push. v0.1.1 is a manual-install pre-release:
+    # Runs on tag push AND on manual dispatch (workflow_dispatch). v0.1.1
+    # is a manual-install pre-release:
     #   - macOS: DeepSeek Harness.app (no .dmg, no latest-mac.yml)
     #   - Windows: DeepSeek-Harness-0.1.1-win-x64/ directory (zipped)
     # Auto-update is not wired in this release; downstream releases
     # will switch to electron-builder NSIS + dmg with proper manifests.
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     needs: [build-mac, build-win]
     runs-on: ubuntu-22.04
     permissions:
@@ -139,8 +141,8 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
+          tag_name: v0.1.1
+          name: v0.1.1
           generate_release_notes: true
           prerelease: true
           files: |
