@@ -21,6 +21,10 @@ permissions:
 
 env:
   NODE_VERSION: '22'
+  # electron-builder's nodeModulesCollector scans every transitive dep and
+  # OOMs on large workspaces. Bump the heap so macOS / Windows packaging
+  # survives the harness's ~200-package transitive closure.
+  NODE_OPTIONS: '--max-old-space-size=8192'
 
 jobs:
   typecheck-test:
@@ -52,11 +56,15 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
+      - run: pnpm run icon:build
       - run: pnpm run dist:mac
       - uses: actions/upload-artifact@v4
         with:
           name: dsh-desktop-mac
-          path: dist/*.dmg
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/latest-mac.yml
           if-no-files-found: error
           retention-days: 14
 
@@ -74,11 +82,14 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
+      - run: pnpm run icon:build
       - run: pnpm run dist:win
       - uses: actions/upload-artifact@v4
         with:
           name: dsh-desktop-win
-          path: dist/*.exe
+          path: |
+            dist/*.exe
+            dist/latest.yml
           if-no-files-found: error
           retention-days: 14
 
@@ -104,6 +115,11 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
+      - run: pnpm run icon:build
+      # `dist:linux` produces the Electron archive at
+      # `dist/DeepSeek-Harness-<version>-linux-x64.tar.gz`. The Flatpak build
+      # reads it, computes sha512 + size, and substitutes them into the
+      # manifest before invoking `flatpak-builder`.
       - run: pnpm run dist:linux
       - run: pnpm run flatpak:build
 
@@ -121,6 +137,8 @@ jobs:
           path: |
             build/flatpak-out/*.flatpak
             build/flatpak-out/repo.tar.gz
+            dist/*.tar.gz
+            dist/latest-linux.yml
           if-no-files-found: error
           retention-days: 14
 
@@ -134,22 +152,26 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: dsh-desktop-mac
-          path: dist/mac
+          path: artifacts/mac
       - uses: actions/download-artifact@v4
         with:
           name: dsh-desktop-win
-          path: dist/win
+          path: artifacts/win
       - uses: actions/download-artifact@v4
         with:
           name: dsh-desktop-linux
-          path: dist/linux
+          path: artifacts/linux
 
       - name: Flatten artifacts for upload
         run: |
-          find dist/mac -name '*.dmg' -exec cp {} dist/ \;
-          find dist/win -name '*.exe' -exec cp {} dist/ \;
-          cp dist/linux/*.flatpak dist/
-          cp dist/linux/repo.tar.gz dist/
+          mkdir -p dist
+          find artifacts/mac -name '*.dmg' -exec cp {} dist/ \;
+          find artifacts/mac -name 'latest-mac.yml' -exec cp {} dist/ \; || true
+          find artifacts/win -name '*.exe' -exec cp {} dist/ \;
+          find artifacts/win -name 'latest.yml' -exec cp {} dist/ \; || true
+          find artifacts/linux -name '*.flatpak' -exec cp {} dist/ \;
+          find artifacts/linux -name 'repo.tar.gz' -exec cp {} dist/ \; || true
+          find artifacts/linux -name 'latest-linux.yml' -exec cp {} dist/ \; || true
           ls -la dist/
 
       - uses: softprops/action-gh-release@v2
@@ -161,4 +183,7 @@ jobs:
             dist/*.exe
             dist/*.flatpak
             dist/repo.tar.gz
-          fail_on_unmatched_files: true
+            dist/latest.yml
+            dist/latest-mac.yml
+            dist/latest-linux.yml
+          fail_on_unmatched_files: false

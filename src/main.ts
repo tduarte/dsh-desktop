@@ -6,9 +6,10 @@
  *   2. Spawn the bundled `dsh web` child from `process.resourcesPath/dsh/lib/bin.js`
  *      with `--no-open --port 0 --host 127.0.0.1` (loopback-only; the OS picks the
  *      port; the CLI's own browser handoff is suppressed so it does not race ours).
- *      The child is launched via Electron's own binary in node mode (`ELECTRON_RUN_AS_NODE=1`)
- *      so we don't carry a separate Node install. `--expose-internals` is required
- *      by `@deepseek-ai/cordis-plugin-hmr`, which the harness's web profile loads
+ *      The child is launched via Electron's own binary in node mode
+ *      (`ELECTRON_RUN_AS_NODE=1` + `--expose-internals`) so we don't carry a
+ *      separate Node install. `--expose-internals` is required by
+ *      `@deepseek-ai/cordis-plugin-hmr`, which the harness's web profile loads
  *      unconditionally to support live-reloading user patches.
  *   3. Buffer child stdout; the moment a line matches `dsh web: http://127.0.0.1:<port>`,
  *      open a `BrowserWindow` against that URL with hardened webPreferences.
@@ -37,6 +38,13 @@ import { Updater } from './updater.ts'
 
 const CHILD_GRACE_MS = 5_000
 const STDERR_TAIL_BYTES = 4_096
+const DEBUG = process.env.DSH_DESKTOP_DEBUG === '1'
+
+function debug(...args: unknown[]): void {
+  if (DEBUG) {
+    process.stderr.write(`[dsh-desktop] ${args.map(String).join(' ')}\n`)
+  }
+}
 
 class UrlDetector {
   private buffer = ''
@@ -70,6 +78,10 @@ class ChildSupervisor {
     // it unconditionally loads in the upstream web profile and crashes without
     // the flag. This is a benign capability grant — the same Node flag is
     // used by VS Code, Discord, and every Cordis-based live-reload app.
+    //
+    // `ELECTRON_RUN_AS_NODE=1` makes the Electron binary run as plain Node.
+    // Electron 43+ requires the env var explicitly; the `--expose-internals`
+    // flag alone no longer flips into Node mode.
     this.proc = spawn(
       nodeBin,
       ['--expose-internals', dshBin, 'web', '--no-open', '--port', '0', '--host', '127.0.0.1'],
@@ -78,18 +90,21 @@ class ChildSupervisor {
         env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
       },
     )
+    debug(`child spawned: pid=${String(this.proc.pid)}, bin=${nodeBin}`)
     this.proc.stdout?.setEncoding('utf8')
     this.proc.stderr?.setEncoding('utf8')
   }
 
   onStdout(listener: (chunk: string) => void): void {
     this.proc.stdout?.on('data', (chunk: string) => {
+      debug(`child stdout: ${chunk.trimEnd()}`)
       listener(chunk)
     })
   }
 
   onStderr(listener: (chunk: string) => void): void {
     this.proc.stderr?.on('data', (chunk: string) => {
+      debug(`child stderr: ${chunk.trimEnd()}`)
       listener(chunk)
     })
   }
@@ -153,8 +168,10 @@ class HarnessDesktopApp {
   private readonly updater = new Updater()
 
   start(): void {
+    debug('start()')
     const lock = app.requestSingleInstanceLock()
     if (!lock) {
+      debug('single-instance lock failed; another instance is running')
       app.quit()
       return
     }
@@ -164,9 +181,13 @@ class HarnessDesktopApp {
     })
 
     void app.whenReady().then(async () => {
+      debug('whenReady fired')
       this.registerIpc()
+      debug('ipc registered')
       await this.updater.start((event) => this.broadcastUpdate(event))
+      debug('updater started')
       await this.bootChild()
+      debug('bootChild done')
     })
 
     app.on('before-quit', async (event) => {
@@ -204,6 +225,7 @@ class HarnessDesktopApp {
 
   private async bootChild(): Promise<void> {
     const dshBin = resolveDshBin()
+    debug(`dshBin=${dshBin}`)
     if (!existsSync(dshBin)) {
       void dialog.showErrorBox(
         'DeepSeek Harness desktop',
@@ -216,7 +238,9 @@ class HarnessDesktopApp {
     this.supervisor = supervisor
     supervisor.onStdout((chunk) => {
       const url = supervisor.detectUrl(chunk)
+      debug(`detectUrl -> ${String(url)}`)
       if (url !== null && this.window === null) {
+        debug(`opening BrowserWindow at ${url}`)
         this.window = new BrowserWindow({
           width: 1280,
           height: 800,
@@ -237,6 +261,7 @@ class HarnessDesktopApp {
       process.stderr.write(chunk)
     })
     supervisor.proc.on('exit', (code) => {
+      debug(`child exit code=${String(code)}`)
       if (code !== 0 && code !== null && this.window === null && !this.shuttingDown) {
         void dialog.showErrorBox(
           'DeepSeek Harness failed to start',
@@ -255,4 +280,5 @@ function resolveDshBin(): string {
   return join(__dirname, '..', 'build', 'stage', 'dsh', 'lib', 'bin.js')
 }
 
+debug(`main.cjs loaded: __dirname=${__dirname}`)
 new HarnessDesktopApp().start()
