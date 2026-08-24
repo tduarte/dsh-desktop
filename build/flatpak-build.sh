@@ -75,20 +75,20 @@ sed \
   "${MANIFEST_SRC}" > "${MANIFEST_RENDERED}"
 
 echo "flatpak: flatpak-builder..."
-flatpak-builder --force-clean \
+flatpak-builder --user --force-clean \
   --repo="${FLATPAK_REPO}" \
   "${FLATPAK_BUILD_DIR}" \
   "${MANIFEST_RENDERED}"
 
 echo "flatpak: build-export..."
-flatpak build-export \
+flatpak build-export --user \
   --runtime-url=https://dl.flathub.org/electron/ \
   "${FLATPAK_REPO}" \
   "${FLATPAK_BUILD_DIR}" \
   "${VERSION}"
 
 echo "flatpak: build-bundle..."
-flatpak build-bundle \
+flatpak build-bundle --user \
   --runtime-url=https://dl.flathub.org/electron/ \
   "${FLATPAK_REPO}" \
   "${FLATPAK_BUNDLE}" \
