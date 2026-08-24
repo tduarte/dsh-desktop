@@ -1,30 +1,20 @@
-# Build and publish DeepSeek Harness desktop installers.
-#
-# Triggers:
-#   - pull_request, push (master): matrix build, smoke test, upload as artifacts
-#   - tag v*: matrix build + create/update GitHub Release with installers + flatpak repo
-#
-# Matrix: macOS (.dmg), Windows (.exe), Linux (.flatpak + OSTree repo).
-# No code signing in this PR.
-
 name: Desktop
 
 on:
-  push:
-    branches: [master]
-    tags: ['v*']
   pull_request:
-  workflow_dispatch:
-
-permissions:
-  contents: write
+    branches: [main]
+    paths:
+      - '.github/workflows/desktop.yml'
+      - 'apps/desktop/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
 
 env:
   NODE_VERSION: '22'
-  # electron-builder's nodeModulesCollector scans every transitive dep and
-  # OOMs on large workspaces. Bump the heap so macOS / Windows packaging
-  # survives the harness's ~200-package transitive closure.
-  NODE_OPTIONS: '--max-old-space-size=12288'
+
+concurrency:
+  group: desktop-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   typecheck-test:
@@ -57,40 +47,16 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
       - run: pnpm run icon:build
-      # electron-builder's nodeModulesCollector walks node_modules/ to build
-      # the production-dep graph and OOMs on ~865 hoisted packages (~761 MB on
-      # disk). Our asar only contains lib/main.cjs + lib/preload.cjs; the
-      # full runtime closure ships as extraResources/dsh/node_modules/ which
-      # the collector never touches. So the collector's job is structurally
-      # empty here, but it still runs. We trick it by setting
-      # EXTRA_NODE_MODULES_DIR to a tiny shim that contains only @deepseek-ai
-      # and the few packages electron-builder itself depends on, leaving the
-      # real node_modules intact at cwd (so electron-builder's binary resolves).
-      - name: Build macOS DMG
-        # electron-builder 26 OOMs on macOS-latest (12 GB) and Windows-latest
-        # (12 GB) runners because the pnpm hoisted tree has ~865 packages and
-        # pnpm list --json materializes them all. We remove the heaviest
-        # @scoped dirs (transitive LLM SDKs, opentelemetry, rolldown, etc.
-        # — none of which our asar references) before invoking electron-builder,
-        # and restore after. The asar only ships lib/main.cjs + lib/preload.cjs,
-        # so removing deps the asar never loads is safe.
-        run: |
-          HUGE="@anthropic-ai @aws @aws-crypto @aws-sdk @babel @esbuild @google @img @mistralai @mixmark-io @opentelemetry @rolldown @rollup @shikijs @smithy @types @vscode"
-          for d in $HUGE; do
-            [ -d "node_modules/$d" ] && mv "node_modules/$d" "_staging_$d"
-          done
-          pnpm run dist:mac
-          rc=$?
-          for d in $HUGE; do
-            [ -d "_staging_$d" ] && mv "_staging_$d" "node_modules/$d"
-          done
-          exit $rc
+      - name: Build macOS .app
+        # Manual pack bypasses electron-builder's OOMing nodeModulesCollector.
+        # Produces dist/DeepSeek Harness.app without invoking electron-builder.
+        run: pnpm run dist:mac
       - uses: actions/upload-artifact@v4
         with:
           name: dsh-desktop-mac
           path: |
+            dist/DeepSeek Harness.app
             dist/*.dmg
-            dist/*.zip
             dist/latest-mac.yml
           if-no-files-found: error
           retention-days: 14
@@ -110,25 +76,14 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
       - run: pnpm run icon:build
-      - name: Build Windows EXE
+      - name: Build Windows directory
         shell: pwsh
-        run: |
-          $huge = @('@anthropic-ai','@aws','@aws-crypto','@aws-sdk','@babel','@esbuild','@google','@img','@mistralai','@mixmark-io','@opentelemetry','@rolldown','@rollup','@shikijs','@smithy','@types','@vscode')
-          foreach ($d in $huge) {
-            if (Test-Path "node_modules/$d") { Move-Item "node_modules/$d" "_staging_$d" }
-          }
-          pnpm run dist:win
-          $rc = $LASTEXITCODE
-          foreach ($d in $huge) {
-            if (Test-Path "_staging_$d") { Move-Item "_staging_$d" "node_modules/$d" }
-          }
-          exit $rc
+        run: pnpm run dist:win
       - uses: actions/upload-artifact@v4
         with:
           name: dsh-desktop-win
           path: |
-            dist/*.exe
-            dist/latest.yml
+            dist/DeepSeek-Harness-*-win-x64/**
           if-no-files-found: error
           retention-days: 14
 
@@ -146,10 +101,6 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install Flatpak + Flathub remote
-        # Runner is non-root; flatpak system operations are rejected with
-        # `Flatpak system operation ConfigureRemote not allowed for user`.
-        # Pin to the user prefix end-to-end: `--user` everywhere.
-        # Also `ostree` for `flatpak build-export` support.
         run: |
           sudo apt-get update
           sudo apt-get install -y flatpak flatpak-builder ostree
@@ -159,95 +110,24 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
       - run: pnpm run icon:build
-      # `dist:linux` produces the Electron archive at
-      # `dist/DeepSeek-Harness-<version>-linux-x64.tar.gz`. The Flatpak build
-      # reads it, computes sha512 + size, and substitutes them into the
-      # manifest before invoking `flatpak-builder`.
-      # electron-builder 26's nodeModulesCollector walks the whole node_modules/
-      # tree to validate production deps, and OOMs on every CI runner when the
-      # hoisted flat tree has ~865 packages (the @anthropic-ai, @opentelemetry,
-      # and LLM SDK chunks in dsh's transitive closure alone hit 200 MB on
-      # disk). Our packaging model deliberately excludes node_modules/ from the
-      # asar and ships the entire staged CLI tree as extraResources/dsh/, so
-      # the collector's job is structurally empty for our package. We move
-      # node_modules/ aside before the build and restore it after; this avoids
-      # the walk entirely (the collector errors out fast with "no node
-      # modules" rather than walking and OOM-ing).
-      - name: Build Linux tarball (TRAVERSAL mode)
-        run: |
-          # Remove pnpm-lock.yaml AND packageManager field so the detector
-          # falls through to TRAVERSAL mode (manual filesystem walk in JS,
-        # far lower heap than spawning `pnpm list --json`).
-          # First rename the lockfile; second clear packageManager by env.
-          mv pnpm-lock.yaml pnpm-lock.yaml.bak
-          unset npm_config_user_agent npm_execpath
-          pnpm run dist:linux
-          rc=$?
-          mv pnpm-lock.yaml.bak pnpm-lock.yaml
-          exit $rc
+      # Manual pack bypasses electron-builder's OOMing nodeModulesCollector.
+      # flatpak-builder consumes this tarball via `extra-data`.
+      - run: pnpm run dist:linux
       - run: pnpm run flatpak:build
 
       - name: Verify .flatpak structure
         run: |
+          test -f dist/DeepSeek-Harness-*-linux-x64.tar.gz
           test -f build/flatpak-out/DeepSeek-Harness-*.flatpak
           test -f build/flatpak-out/repo.tar.gz
-          # Smoke-test: install to a throwaway user prefix and confirm the
-          # entry resolves; we don't run the GUI here (CI has no display).
           flatpak --user install --bundle build/flatpak-out/DeepSeek-Harness-*.flatpak ai.deepseek.harness.desktop || true
 
       - uses: actions/upload-artifact@v4
         with:
           name: dsh-desktop-linux
           path: |
+            dist/DeepSeek-Harness-*-linux-x64.tar.gz
             build/flatpak-out/*.flatpak
             build/flatpak-out/repo.tar.gz
-            dist/*.tar.gz
-            dist/latest-linux.yml
           if-no-files-found: error
           retention-days: 14
-
-  release:
-    name: Publish GitHub Release
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build-mac, build-win, build-linux]
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/download-artifact@v4
-        with:
-          name: dsh-desktop-mac
-          path: artifacts/mac
-      - uses: actions/download-artifact@v4
-        with:
-          name: dsh-desktop-win
-          path: artifacts/win
-      - uses: actions/download-artifact@v4
-        with:
-          name: dsh-desktop-linux
-          path: artifacts/linux
-
-      - name: Flatten artifacts for upload
-        run: |
-          mkdir -p dist
-          find artifacts/mac -name '*.dmg' -exec cp {} dist/ \;
-          find artifacts/mac -name 'latest-mac.yml' -exec cp {} dist/ \; || true
-          find artifacts/win -name '*.exe' -exec cp {} dist/ \;
-          find artifacts/win -name 'latest.yml' -exec cp {} dist/ \; || true
-          find artifacts/linux -name '*.flatpak' -exec cp {} dist/ \;
-          find artifacts/linux -name 'repo.tar.gz' -exec cp {} dist/ \; || true
-          find artifacts/linux -name 'latest-linux.yml' -exec cp {} dist/ \; || true
-          ls -la dist/
-
-      - uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          generate_release_notes: true
-          files: |
-            dist/*.dmg
-            dist/*.exe
-            dist/*.flatpak
-            dist/repo.tar.gz
-            dist/latest.yml
-            dist/latest-mac.yml
-            dist/latest-linux.yml
-          fail_on_unmatched_files: false
