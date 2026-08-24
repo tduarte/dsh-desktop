@@ -2,8 +2,6 @@ app-id: ai.deepseek.harness.desktop
 runtime: org.electronjs.Electron2.BaseApp
 runtime-version: '24.08'
 sdk: org.electronjs.Electron2.BaseApp//24.08
-base: org.electronjs.Electron2.BaseApp//24.08
-base-version: '24.08'
 command: dsh-desktop
 
 finish-args:
@@ -43,10 +41,15 @@ modules:
 
   - name: electron-shell
     type: extra-data
-    url: https://github.com/tduarte/dsh-desktop/releases/download/v${VERSION}/DeepSeek-Harness-${VERSION}-linux-x64.tar.gz
+    sources:
+      - type: file
+        path: ../dist/DeepSeek-Harness-${VERSION}-linux-x64.tar.gz
+        dest: dsh-desktop.tar.gz
+    # Pre-bundled tarball lives next to the manifest in the build dir; flatpak-builder
+    # reads it as a local file source rather than fetching from the URL at build time.
+    # The release URL is documented in the cook-book for end-user OSTree updates.
     sha512: REPLACE_WITH_SHA512
     size: REPLACE_WITH_SIZE
-    filename: dsh-desktop.tar.gz
 
   - name: desktop-file
     type: file
