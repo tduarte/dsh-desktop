@@ -16,7 +16,7 @@
  *       - resources/dist/    (frontend Vite output)
  *
  * The flatpak manifest references this tarball under `extra-data`. See
- * flatpak/ai.deepseek.harness.desktop.yml.
+ * flatpak/io.github.tduarte.dsh-desktop.yml.
  */
 
 import { cp, mkdir, readFile, rm, stat } from 'node:fs/promises'

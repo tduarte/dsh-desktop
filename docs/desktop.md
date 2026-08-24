@@ -54,7 +54,7 @@ alongside the `.flatpak`, so users can run:
 flatpak remote-add --from \
   https://github.com/tduarte/dsh-desktop/releases/download/<tag>/repo.tar.gz \
   dsh-desktop
-flatpak update ai.deepseek.harness.desktop
+flatpak update io.github.tduarte.dsh-desktop
 ```
 
 ## Bundle staging

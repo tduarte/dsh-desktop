@@ -4,7 +4,7 @@
 # Inputs:
 #   1. The prebuilt Electron archive (the `--tarball` argument) produced by
 #      `pnpm run dist:linux` (writes to `dist/DeepSeek-Harness-<version>-linux-x64.tar.gz`).
-#   2. `flatpak/ai.deepseek.harness.desktop.yml` — the Flatpak manifest with
+#   2. `flatpak/io.github.tduarte.dsh-desktop.yml` — the Flatpak manifest with
 #      `REPLACE_WITH_SHA512` and `REPLACE_WITH_SIZE` placeholders.
 #
 # This script:
@@ -26,7 +26,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_ID="ai.deepseek.harness.desktop"
+APP_ID="io.github.tduarte.dsh-desktop"
 VERSION="${VERSION:-$(node -e "console.log(require('${REPO_ROOT}/package.json').version)")}"
 OUT_DIR="${OUT_DIR:-${REPO_ROOT}/build/flatpak-out}"
 TARBALL="${1:-${REPO_ROOT}/dist/DeepSeek-Harness-${VERSION}-linux-x64.tar.gz}"

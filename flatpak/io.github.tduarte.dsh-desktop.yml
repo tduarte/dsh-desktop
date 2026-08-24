@@ -1,4 +1,4 @@
-app-id: ai.deepseek.harness.desktop
+app-id: io.github.tduarte.dsh-desktop
 runtime: org.electronjs.Electron2.BaseApp
 runtime-version: '24.08'
 sdk: org.electronjs.Electron2.BaseApp//24.08
@@ -26,7 +26,7 @@ finish-args:
   - --talk-name=org.freedesktop.Notifications
   - --talk-name=org.kde.StatusNotifierWatcher
   # DBus name ownership
-  - --own-name=ai.deepseek.harness.desktop
+  - --own-name=io.github.tduarte.dsh-desktop
 
 modules:
   - name: stage
@@ -55,14 +55,14 @@ modules:
     type: file
     sources:
       - type: file
-        path: ai.deepseek.harness.desktop.desktop
+        path: io.github.tduarte.dsh-desktop.desktop
         dest: share/applications/
 
   - name: metainfo
     type: file
     sources:
       - type: file
-        path: ai.deepseek.harness.desktop.metainfo.xml
+        path: io.github.tduarte.dsh-desktop.metainfo.xml
         dest: share/metainfo/
 
   - name: icons
@@ -70,25 +70,25 @@ modules:
     sources:
       - type: file
         path: ../build/icon-16.png
-        dest: share/icons/hicolor/16x16/apps/ai.deepseek.harness.desktop.png
+        dest: share/icons/hicolor/16x16/apps/io.github.tduarte.dsh-desktop.png
       - type: file
         path: ../build/icon-32.png
-        dest: share/icons/hicolor/32x32/apps/ai.deepseek.harness.desktop.png
+        dest: share/icons/hicolor/32x32/apps/io.github.tduarte.dsh-desktop.png
       - type: file
         path: ../build/icon-48.png
-        dest: share/icons/hicolor/48x48/apps/ai.deepseek.harness.desktop.png
+        dest: share/icons/hicolor/48x48/apps/io.github.tduarte.dsh-desktop.png
       - type: file
         path: ../build/icon-64.png
-        dest: share/icons/hicolor/64x64/apps/ai.deepseek.harness.desktop.png
+        dest: share/icons/hicolor/64x64/apps/io.github.tduarte.dsh-desktop.png
       - type: file
         path: ../build/icon-128.png
-        dest: share/icons/hicolor/128x128/apps/ai.deepseek.harness.desktop.png
+        dest: share/icons/hicolor/128x128/apps/io.github.tduarte.dsh-desktop.png
       - type: file
         path: ../build/icon-256.png
-        dest: share/icons/hicolor/256x256/apps/ai.deepseek.harness.desktop.png
+        dest: share/icons/hicolor/256x256/apps/io.github.tduarte.dsh-desktop.png
       - type: file
         path: ../build/icon-512.png
-        dest: share/icons/hicolor/512x512/apps/ai.deepseek.harness.desktop.png
+        dest: share/icons/hicolor/512x512/apps/io.github.tduarte.dsh-desktop.png
 
   - name: wrapper
     type: script

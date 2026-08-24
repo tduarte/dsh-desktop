@@ -110,7 +110,7 @@ async function main() {
       )
       .replace(
         /<key>CFBundleIdentifier<\/key>\s*<string>[^<]+<\/string>/,
-        '<key>CFBundleIdentifier</key><string>ai.deepseek.harness.desktop</string>',
+        '<key>CFBundleIdentifier</key><string>io.github.tduarte.dsh-desktop</string>',
       )
       .replace(
         /<key>CFBundleExecutable<\/key>\s*<string>[^<]+<\/string>/,

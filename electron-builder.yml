@@ -1,6 +1,6 @@
 # electron-builder configuration for macOS and Windows.
 #
-# Linux uses `flatpak-builder` (see flatpak/ai.deepseek.harness.desktop.yml);
+# Linux uses `flatpak-builder` (see flatpak/io.github.tduarte.dsh-desktop.yml);
 # this file's linux section is intentionally absent — CI runs electron-builder
 # --linux --x64 separately to produce the archive flatpak-builder consumes
 # via `extra-data`.
@@ -8,7 +8,7 @@
 # Code signing / notarization is deferred. macOS: users right-click → Open.
 # Windows: SmartScreen warns. Both land in a follow-up PR.
 
-appId: ai.deepseek.harness.desktop
+appId: io.github.tduarte.dsh-desktop
 productName: DeepSeek Harness
 copyright: Copyright © 2026 DeepSeek
 asar: true
