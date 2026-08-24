@@ -31,7 +31,8 @@
     "onlyBuiltDependencies": [
       "electron",
       "esbuild",
-      "@deepseek-ai/dsh-subprocess-local"
+      "@parcel/watcher",
+      "node-gyp-build"
     ]
   },
   "dependencies": {
