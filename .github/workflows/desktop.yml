@@ -8,6 +8,9 @@ on:
       - 'apps/desktop/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
+  push:
+    tags:
+      - 'v*'
 
 env:
   NODE_VERSION: '22'
@@ -97,5 +100,63 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  release:
+    name: Publish GitHub Release
+    # Runs on tag push. v0.1.1 is a manual-install pre-release:
+    #   - macOS: DeepSeek Harness.app (no .dmg, no latest-mac.yml)
+    #   - Windows: DeepSeek-Harness-0.1.1-win-x64/ directory (zipped)
+    # Auto-update is not wired in this release; downstream releases
+    # will switch to electron-builder NSIS + dmg with proper manifests.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-mac, build-win]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dsh-desktop-mac
+          path: artifacts/mac
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dsh-desktop-win
+          path: artifacts/win
+      - name: Zip Windows directory
+        # Updater-free v0.1.1: ship the directory as a zip so users have
+        # a single download artifact. Renamed from the raw dist output.
+        working-directory: artifacts/win
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          dir=(DeepSeek-Harness-*-win-x64)
+          if [ "${#dir[@]}" -ne 1 ]; then
+            echo "expected exactly one win-x64 directory, got: ${dir[*]}" >&2
+            exit 1
+          fi
+          (cd "$dir" && zip -r "../${dir}.zip" .)
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          prerelease: true
+          files: |
+            artifacts/mac/DeepSeek Harness.app/**
+            artifacts/mac/*.dmg
+            artifacts/mac/latest-mac.yml
+            artifacts/win/*.zip
+
   build-linux:
     name: Build Linux (.flatpak)
+    # TODO(post-0.1.1): wire flatpak-builder, ostree export, and .flatpak
+    # upload. Linux release is intentionally deferred — leaving the job
+    # header so the file remains valid YAML and the release job can be
+    # added without re-litigating layout. Tracked separately.
+    if: false
+    runs-on: ubuntu-22.04
+    needs: typecheck-test
+    steps:
+      - run: echo "build-linux: deferred"
