@@ -75,3 +75,6 @@ CI runs all three on `v<version>` tags and uploads the artifacts to GitHub Relea
 All filesystem / subprocess work inside the webserver session flows through the harness's Cordis plugin graph in the child `dsh` process — same trust surface as `dsh --profile web` invoked from a terminal.
 
 See `docs/desktop.md` for the sandbox posture and security notes.
+## CI status
+
+Latest CI run: see the Actions tab.
