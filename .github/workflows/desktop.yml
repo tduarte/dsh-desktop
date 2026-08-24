@@ -107,11 +107,15 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install Flatpak + Flathub remote
+        # Runner is non-root; flatpak system operations are rejected with
+        # `Flatpak system operation ConfigureRemote not allowed for user`.
+        # Pin to the user prefix end-to-end: `--user` everywhere.
+        # Also `ostree` for `flatpak build-export` support.
         run: |
           sudo apt-get update
-          sudo apt-get install -y flatpak flatpak-builder
-          flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-          flatpak install --user flathub org.electronjs.Electron2.BaseApp//24.08
+          sudo apt-get install -y flatpak flatpak-builder ostree
+          flatpak --user remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak --user install flathub org.electronjs.Electron2.BaseApp//24.08
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build

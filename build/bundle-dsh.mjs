@@ -27,10 +27,15 @@
 
 import { cp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join, resolve, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import process from 'node:process'
 
-const repoRoot = resolve(dirname(new URL(import.meta.url).pathname), '..')
+// `import.meta.url` on Windows yields `file:///D:/...` whose `.pathname`
+// returns `/D:/...`; a naive `dirname(new URL(import.meta.url).pathname)`
+// followed by `resolve(...)` doubles up the drive prefix and breaks all
+// downstream joins. `fileURLToPath` is the only correct conversion.
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const stageRoot = join(repoRoot, 'build', 'stage')
 const stageDsh = join(stageRoot, 'dsh')
 const stageDist = join(stageRoot, 'dist')
@@ -89,5 +94,4 @@ async function main() {
   process.stdout.write('bundle-dsh: done\n')
 }
 
-const sep = (await import('node:path')).sep
 await main()
