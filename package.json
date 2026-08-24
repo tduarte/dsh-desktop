@@ -3,6 +3,7 @@
   "description": "DeepSeek Harness desktop app: Electron host shell for the dsh webserver, packaged for macOS, Windows, and Linux (Flatpak). Auto-updates from GitHub Releases.",
   "version": "0.1.1-rc.2",
   "private": true,
+  "author": "tduarte",
   "main": "lib/main.cjs",
   "type": "commonjs",
   "repository": {
@@ -17,6 +18,7 @@
     "dist:win": "electron-builder --win --x64",
     "dist:linux": "electron-builder --linux --x64",
     "flatpak:build": "bash build/flatpak-build.sh",
+    "icon:build": "node build/build-icons.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
@@ -34,8 +36,8 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "electron": "32.2.5",
-    "electron-builder": "25.1.8",
+    "electron": "42.9.3",
+    "electron-builder": "26.15.7",
     "electron-updater": "6.3.9",
     "sharp": "^0.35.3",
     "tsdown": "^0.22.14",

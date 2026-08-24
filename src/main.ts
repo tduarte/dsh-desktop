@@ -6,6 +6,10 @@
  *   2. Spawn the bundled `dsh web` child from `process.resourcesPath/dsh/lib/bin.js`
  *      with `--no-open --port 0 --host 127.0.0.1` (loopback-only; the OS picks the
  *      port; the CLI's own browser handoff is suppressed so it does not race ours).
+ *      The child is launched via Electron's own binary in node mode (`ELECTRON_RUN_AS_NODE=1`)
+ *      so we don't carry a separate Node install. `--expose-internals` is required
+ *      by `@deepseek-ai/cordis-plugin-hmr`, which the harness's web profile loads
+ *      unconditionally to support live-reloading user patches.
  *   3. Buffer child stdout; the moment a line matches `dsh web: http://127.0.0.1:<port>`,
  *      open a `BrowserWindow` against that URL with hardened webPreferences.
  *   4. On `app.before-quit`: SIGTERM the child, wait up to 5 s, then SIGKILL (or
@@ -62,10 +66,18 @@ class ChildSupervisor {
   private urlDetector = new UrlDetector()
 
   constructor(nodeBin: string, dshBin: string) {
-    this.proc = spawn(nodeBin, [dshBin, 'web', '--no-open', '--port', '0', '--host', '127.0.0.1'], {
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
-    })
+    // Pass `--expose-internals` so `@deepseek-ai/cordis-plugin-hmr` can attach;
+    // it unconditionally loads in the upstream web profile and crashes without
+    // the flag. This is a benign capability grant — the same Node flag is
+    // used by VS Code, Discord, and every Cordis-based live-reload app.
+    this.proc = spawn(
+      nodeBin,
+      ['--expose-internals', dshBin, 'web', '--no-open', '--port', '0', '--host', '127.0.0.1'],
+      {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+      },
+    )
     this.proc.stdout?.setEncoding('utf8')
     this.proc.stderr?.setEncoding('utf8')
   }
