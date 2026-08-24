@@ -1,0 +1,4 @@
+provider: github
+owner: tduarte
+repo: dsh-desktop
+releaseType: release

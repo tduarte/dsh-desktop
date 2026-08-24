@@ -1,0 +1,45 @@
+{
+  "name": "@deepseek-ai/dsh-desktop",
+  "description": "DeepSeek Harness desktop app: Electron host shell for the dsh webserver, packaged for macOS, Windows, and Linux (Flatpak). Auto-updates from GitHub Releases.",
+  "version": "0.1.1-rc.2",
+  "private": true,
+  "main": "lib/main.cjs",
+  "type": "commonjs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tduarte/dsh-desktop.git"
+  },
+  "scripts": {
+    "build": "node build/bundle-dsh.mjs && tsdown",
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist:mac": "electron-builder --mac --x64 --arm64",
+    "dist:win": "electron-builder --win --x64",
+    "dist:linux": "electron-builder --linux --x64",
+    "flatpak:build": "bash build/flatpak-build.sh",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "license": "MIT",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "esbuild",
+      "@deepseek-ai/dsh-subprocess-local"
+    ]
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-web-frontend": "0.0.1-rc.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "electron": "32.2.5",
+    "electron-builder": "25.1.8",
+    "electron-updater": "6.3.9",
+    "sharp": "^0.35.3",
+    "tsdown": "^0.22.14",
+    "typescript": "^6.0.3",
+    "vitest": "^2.1.8"
+  }
+}

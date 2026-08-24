@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>ai.deepseek.harness.desktop</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>DeepSeek Harness</name>
+  <summary>Local-first AI agent harness with a desktop UI</summary>
+  <description>
+    <p>
+      DeepSeek Harness is a local-first AI agent platform: a Cordis plugin
+      graph, persistent sessions, and a desktop UI that talks to a Node
+      webserver child process.
+    </p>
+    <p>
+      Features: profile-based command line, browser and desktop UI surfaces,
+      filesystem and shell tools, MCP client, multi-turn conversation with
+      tool calls, durable session log in SQLite.
+    </p>
+  </description>
+  <categories>
+    <category>Development</category>
+    <category>Utility</category>
+  </categories>
+  <keywords>
+    <keyword>ai</keyword>
+    <keyword>agent</keyword>
+    <keyword>harness</keyword>
+    <keyword>chat</keyword>
+  </keywords>
+  <url type="homepage">https://github.com/tduarte/dsh-desktop</url>
+  <url type="bugtracker">https://github.com/tduarte/dsh-desktop/issues</url>
+  <launchable type="desktop-id">ai.deepseek.harness.desktop.desktop</launchable>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="0.1.1-rc.2" date="2026-08-24">
+      <description>
+        <p>Initial desktop release: macOS DMG, Windows NSIS, Linux Flatpak.</p>
+      </description>
+    </release>
+  </releases>
+</component>

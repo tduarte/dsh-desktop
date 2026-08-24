@@ -1,0 +1,13 @@
+node_modules/
+lib/
+*.tsbuildinfo
+build/stage/
+build/.deploy-tmp/
+build/.npm-stage/
+build/flatpak-out/
+dist/
+.DS_Store
+.vscode/
+.idea/
+coverage/
+*.log

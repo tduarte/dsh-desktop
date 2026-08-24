@@ -1,0 +1,100 @@
+app-id: ai.deepseek.harness.desktop
+runtime: org.electronjs.Electron2.BaseApp
+runtime-version: '24.08'
+sdk: org.electronjs.Electron2.BaseApp//24.08
+base: org.electronjs.Electron2.BaseApp//24.08
+base-version: '24.08'
+command: dsh-desktop
+
+finish-args:
+  # Display
+  - --socket=wayland
+  - --socket=fallback-x11
+  # Audio
+  - --socket=pulseaudio
+  # D-Bus
+  - --socket=session-bus
+  # Filesystem
+  - --filesystem=home
+  - --filesystem=xdg-run/dsh:create
+  - --filesystem=xdg-config/dsh:create
+  - --filesystem=/tmp:create
+  # IPC / network
+  - --share=network
+  - --share=ipc
+  # Environment: route the harness's $DSH_HOME into the per-app data dir.
+  - --env=DSH_HOME=xdg-data/dsh
+  # Notifications + system tray
+  - --talk-name=org.freedesktop.Notifications
+  - --talk-name=org.kde.StatusNotifierWatcher
+  # DBus name ownership
+  - --own-name=ai.deepseek.harness.desktop
+
+modules:
+  - name: stage
+    type: file
+    sources:
+      - type: file
+        path: ../build/stage/dsh
+        dest: dsh
+      - type: file
+        path: ../build/stage/dist
+        dest: dist
+
+  - name: electron-shell
+    type: extra-data
+    url: https://github.com/tduarte/dsh-desktop/releases/download/v${VERSION}/DeepSeek-Harness-${VERSION}-linux-x64.tar.gz
+    sha512: REPLACE_WITH_SHA512
+    size: REPLACE_WITH_SIZE
+    filename: dsh-desktop.tar.gz
+
+  - name: desktop-file
+    type: file
+    sources:
+      - type: file
+        path: ai.deepseek.harness.desktop.desktop
+        dest: share/applications/
+
+  - name: metainfo
+    type: file
+    sources:
+      - type: file
+        path: ai.deepseek.harness.desktop.metainfo.xml
+        dest: share/metainfo/
+
+  - name: icons
+    type: file
+    sources:
+      - type: file
+        path: ../build/icon-16.png
+        dest: share/icons/hicolor/16x16/apps/ai.deepseek.harness.desktop.png
+      - type: file
+        path: ../build/icon-32.png
+        dest: share/icons/hicolor/32x32/apps/ai.deepseek.harness.desktop.png
+      - type: file
+        path: ../build/icon-48.png
+        dest: share/icons/hicolor/48x48/apps/ai.deepseek.harness.desktop.png
+      - type: file
+        path: ../build/icon-64.png
+        dest: share/icons/hicolor/64x64/apps/ai.deepseek.harness.desktop.png
+      - type: file
+        path: ../build/icon-128.png
+        dest: share/icons/hicolor/128x128/apps/ai.deepseek.harness.desktop.png
+      - type: file
+        path: ../build/icon-256.png
+        dest: share/icons/hicolor/256x256/apps/ai.deepseek.harness.desktop.png
+      - type: file
+        path: ../build/icon-512.png
+        dest: share/icons/hicolor/512x512/apps/ai.deepseek.harness.desktop.png
+
+  - name: wrapper
+    type: script
+    build-commands:
+      - install -Dm 0755 wrapper.sh /app/bin/dsh-desktop
+    sources:
+      - type: file
+        path: wrapper.sh
+
+build-options:
+  cflags: -O2
+  append-path: /usr/bin
