@@ -57,7 +57,15 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
       - run: pnpm run icon:build
-      - run: pnpm run dist:mac
+      # Move node_modules aside before electron-builder; the collector would
+      # otherwise OOM. See the Linux job for the rationale.
+      - name: Build macOS DMG (no node_modules walk)
+        run: |
+          if [ -d node_modules ]; then mv node_modules node_modules.bak; fi
+          pnpm run dist:mac
+          rc=$?
+          if [ -d node_modules.bak ]; then mv node_modules.bak node_modules; fi
+          exit $rc
       - uses: actions/upload-artifact@v4
         with:
           name: dsh-desktop-mac
@@ -83,7 +91,14 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
       - run: pnpm run icon:build
-      - run: pnpm run dist:win
+      - name: Build Windows EXE (no node_modules walk)
+        shell: pwsh
+        run: |
+          if (Test-Path node_modules) { Move-Item node_modules node_modules.bak }
+          pnpm run dist:win
+          $rc = $LASTEXITCODE
+          if (Test-Path node_modules.bak) { Move-Item node_modules.bak node_modules }
+          exit $rc
       - uses: actions/upload-artifact@v4
         with:
           name: dsh-desktop-win
@@ -124,7 +139,23 @@ jobs:
       # `dist/DeepSeek-Harness-<version>-linux-x64.tar.gz`. The Flatpak build
       # reads it, computes sha512 + size, and substitutes them into the
       # manifest before invoking `flatpak-builder`.
-      - run: pnpm run dist:linux
+      # electron-builder 26's nodeModulesCollector walks the whole node_modules/
+      # tree to validate production deps, and OOMs on every CI runner when the
+      # hoisted flat tree has ~865 packages (the @anthropic-ai, @opentelemetry,
+      # and LLM SDK chunks in dsh's transitive closure alone hit 200 MB on
+      # disk). Our packaging model deliberately excludes node_modules/ from the
+      # asar and ships the entire staged CLI tree as extraResources/dsh/, so
+      # the collector's job is structurally empty for our package. We move
+      # node_modules/ aside before the build and restore it after; this avoids
+      # the walk entirely (the collector errors out fast with "no node
+      # modules" rather than walking and OOM-ing).
+      - name: Build Linux tarball (no node_modules walk)
+        run: |
+          if [ -d node_modules ]; then mv node_modules node_modules.bak; fi
+          pnpm run dist:linux
+          rc=$?
+          if [ -d node_modules.bak ]; then mv node_modules.bak node_modules; fi
+          exit $rc
       - run: pnpm run flatpak:build
 
       - name: Verify .flatpak structure
