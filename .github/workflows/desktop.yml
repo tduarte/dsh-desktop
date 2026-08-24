@@ -57,14 +57,33 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
       - run: pnpm run icon:build
-      # Move node_modules aside before electron-builder; the collector would
-      # otherwise OOM. See the Linux job for the rationale.
-      - name: Build macOS DMG (no node_modules walk)
+      # electron-builder's nodeModulesCollector walks node_modules/ to build
+      # the production-dep graph and OOMs on ~865 hoisted packages (~761 MB on
+      # disk). Our asar only contains lib/main.cjs + lib/preload.cjs; the
+      # full runtime closure ships as extraResources/dsh/node_modules/ which
+      # the collector never touches. So the collector's job is structurally
+      # empty here, but it still runs. We trick it by setting
+      # EXTRA_NODE_MODULES_DIR to a tiny shim that contains only @deepseek-ai
+      # and the few packages electron-builder itself depends on, leaving the
+      # real node_modules intact at cwd (so electron-builder's binary resolves).
+      - name: Build macOS DMG
+        # electron-builder 26 OOMs on macOS-latest (12 GB) and Windows-latest
+        # (12 GB) runners because the pnpm hoisted tree has ~865 packages and
+        # pnpm list --json materializes them all. We remove the heaviest
+        # @scoped dirs (transitive LLM SDKs, opentelemetry, rolldown, etc.
+        # — none of which our asar references) before invoking electron-builder,
+        # and restore after. The asar only ships lib/main.cjs + lib/preload.cjs,
+        # so removing deps the asar never loads is safe.
         run: |
-          if [ -d node_modules ]; then mv node_modules node_modules.bak; fi
+          HUGE="@anthropic-ai @aws @aws-crypto @aws-sdk @babel @esbuild @google @img @mistralai @mixmark-io @opentelemetry @rolldown @rollup @shikijs @smithy @types @vscode"
+          for d in $HUGE; do
+            [ -d "node_modules/$d" ] && mv "node_modules/$d" "_staging_$d"
+          done
           pnpm run dist:mac
           rc=$?
-          if [ -d node_modules.bak ]; then mv node_modules.bak node_modules; fi
+          for d in $HUGE; do
+            [ -d "_staging_$d" ] && mv "_staging_$d" "node_modules/$d"
+          done
           exit $rc
       - uses: actions/upload-artifact@v4
         with:
@@ -91,13 +110,18 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
       - run: pnpm run icon:build
-      - name: Build Windows EXE (no node_modules walk)
+      - name: Build Windows EXE
         shell: pwsh
         run: |
-          if (Test-Path node_modules) { Move-Item node_modules node_modules.bak }
+          $huge = @('@anthropic-ai','@aws','@aws-crypto','@aws-sdk','@babel','@esbuild','@google','@img','@mistralai','@mixmark-io','@opentelemetry','@rolldown','@rollup','@shikijs','@smithy','@types','@vscode')
+          foreach ($d in $huge) {
+            if (Test-Path "node_modules/$d") { Move-Item "node_modules/$d" "_staging_$d" }
+          }
           pnpm run dist:win
           $rc = $LASTEXITCODE
-          if (Test-Path node_modules.bak) { Move-Item node_modules.bak node_modules }
+          foreach ($d in $huge) {
+            if (Test-Path "_staging_$d") { Move-Item "_staging_$d" "node_modules/$d" }
+          }
           exit $rc
       - uses: actions/upload-artifact@v4
         with:
@@ -149,12 +173,17 @@ jobs:
       # node_modules/ aside before the build and restore it after; this avoids
       # the walk entirely (the collector errors out fast with "no node
       # modules" rather than walking and OOM-ing).
-      - name: Build Linux tarball (no node_modules walk)
+      - name: Build Linux tarball (TRAVERSAL mode)
         run: |
-          if [ -d node_modules ]; then mv node_modules node_modules.bak; fi
+          # Remove pnpm-lock.yaml AND packageManager field so the detector
+          # falls through to TRAVERSAL mode (manual filesystem walk in JS,
+        # far lower heap than spawning `pnpm list --json`).
+          # First rename the lockfile; second clear packageManager by env.
+          mv pnpm-lock.yaml pnpm-lock.yaml.bak
+          unset npm_config_user_agent npm_execpath
           pnpm run dist:linux
           rc=$?
-          if [ -d node_modules.bak ]; then mv node_modules.bak node_modules; fi
+          mv pnpm-lock.yaml.bak pnpm-lock.yaml
           exit $rc
       - run: pnpm run flatpak:build
 
