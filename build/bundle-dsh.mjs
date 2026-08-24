@@ -4,25 +4,30 @@
  * `@deepseek-ai/dsh-web-frontend` (Vite dist) into `build/stage/` so the
  * packaged Electron app can `spawn` them as a child process.
  *
- * Strategy:
- *   1. Run `npm install` in a fresh temp dir with `@deepseek-ai/dsh` and
- *      `@deepseek-ai/dsh-web-frontend` declared as direct deps. npm hoists
- *      peer dependencies natively, so the resulting tree is self-contained.
- *      (pnpm's `deploy --legacy` skips peer deps and the `pnpm deploy`
- *      workspace mode is opt-in — npm is simpler and correct.)
- *   2. Copy `node_modules/@deepseek-ai/dsh/{lib,config,package.json}` plus
- *      the entire `node_modules/` (peer deps) into `build/stage/dsh/`.
- *   3. Copy `node_modules/@deepseek-ai/dsh-web-frontend/dist/` into
- *      `build/stage/dist/`.
+ * Source-of-truth layout:
+ *   node_modules/@deepseek-ai/dsh/                          (CLI package)
+ *   node_modules/@deepseek-ai/dsh-web-frontend/dist/       (frontend dist)
  *
- * Why we don't ship dsh-web-frontend's deps: the frontend is a built Vite
- * dist (static assets only); nothing in the desktop runs its source.
+ * Outputs:
+ *   build/stage/dsh/lib/bin.js          (CLI entry)
+ *   build/stage/dsh/node_modules/...    (full transitive dep closure)
+ *   build/stage/dist/index.html         (frontend entry)
+ *
+ * Strategy:
+ *   We rely on the project's `.npmrc` (node-linker=hoisted +
+ *   shamefully-hoist=true + auto-install-peers=true) to produce a flat
+ *   `node_modules/` tree at install time. The transitive peer-dep closure
+ *   (`@deepseek-ai/cordis-plugin-*`, `@deepseek-ai/dsh-*` workspace
+ *   packages) is already resolved into the workspace root, so we just copy
+ *   it. This avoids the previous `npm install` round-trip (which took 6+
+ *   minutes on cold CI runners).
+ *
+ * Failure mode: abort with a non-zero exit on any missing artifact.
  */
 
 import { cp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { spawnSync } from 'node:child_process'
 import process from 'node:process'
 
 const repoRoot = resolve(dirname(new URL(import.meta.url).pathname), '..')
@@ -44,33 +49,6 @@ async function assertExists(path, label) {
   }
 }
 
-/**
- * Run `npm install --omit=dev` in a fresh temp dir to materialize a self-contained
- * dependency closure of `@deepseek-ai/dsh`. Returns the path of the install root.
- */
-async function npmInstallDsh() {
-  const stage = join(repoRoot, 'build', '.npm-stage')
-  await rm(stage, { recursive: true, force: true })
-  await mkdir(stage, { recursive: true })
-  await writeFile(join(stage, 'package.json'), JSON.stringify({
-    name: 'dsh-stage',
-    version: '0.0.0',
-    private: true,
-    dependencies: {
-      '@deepseek-ai/dsh': '0.1.1-rc.2',
-    },
-  }, null, 2))
-  const result = spawnSync('npm', ['install', '--omit=dev', '--no-audit', '--no-fund'], {
-    cwd: stage,
-    stdio: 'inherit',
-  })
-  if (result.error !== undefined) throw result.error
-  if (result.status !== 0) {
-    fail(`npm install exited with code ${String(result.status ?? result.signal)}`)
-  }
-  return stage
-}
-
 async function main() {
   await assertExists(cliSource, '@deepseek-ai/dsh package directory')
   await assertExists(webSource, '@deepseek-ai/dsh-web-frontend/dist')
@@ -79,22 +57,28 @@ async function main() {
 
   await mkdir(stageRoot, { recursive: true })
 
-  process.stdout.write('bundle-dsh: npm install @deepseek-ai/dsh (resolves peer deps)\n')
-  const stage = await npmInstallDsh()
-  const stagedNodeModules = join(stage, 'node_modules')
-
   if (existsSync(stageDsh)) await rm(stageDsh, { recursive: true, force: true })
-  await mkdir(stageDsh, { recursive: true })
   process.stdout.write('bundle-dsh: copying CLI into build/stage/dsh\n')
-  await cp(join(stagedNodeModules, '@deepseek-ai', 'dsh'), stageDsh, {
+  await cp(cliSource, stageDsh, {
     recursive: true,
     dereference: true,
   })
-  await cp(stagedNodeModules, join(stageDsh, 'node_modules'), {
+
+  process.stdout.write('bundle-dsh: copying flat node_modules closure\n')
+  const nodeModulesSource = join(repoRoot, 'node_modules')
+  await cp(nodeModulesSource, join(stageDsh, 'node_modules'), {
     recursive: true,
     dereference: true,
+    filter: (source) => {
+      // Drop caches and bins that aren't runtime-relevant.
+      if (source.includes(`${sep}.bin${sep}`)) return false
+      if (source.includes(`${sep}.cache${sep}`)) return false
+      if (source.includes(`${sep}.pnpm-store${sep}`)) return false
+      if (source.includes(`${sep}.modules.yaml`)) return false
+      if (source.includes(`${sep}node_modules${sep}.pnpm${sep}`)) return false
+      return true
+    },
   })
-  await rm(stage, { recursive: true, force: true })
 
   process.stdout.write('bundle-dsh: staging web dist → build/stage/dist\n')
   if (existsSync(stageDist)) await rm(stageDist, { recursive: true, force: true })
@@ -105,4 +89,5 @@ async function main() {
   process.stdout.write('bundle-dsh: done\n')
 }
 
+const sep = (await import('node:path')).sep
 await main()
