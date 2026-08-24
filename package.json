@@ -23,6 +23,10 @@
     "test": "vitest run"
   },
   "license": "MIT",
+  "packageManager": "pnpm@10.18.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "pnpm": {
     "onlyBuiltDependencies": [
       "electron",
