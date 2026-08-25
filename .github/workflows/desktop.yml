@@ -186,6 +186,7 @@ jobs:
           name: dsh-desktop-win
           path: artifacts/win
       - name: Download Linux artifact
+        uses: actions/download-artifact@v4
         with:
           name: dsh-desktop-linux
           path: artifacts/linux
