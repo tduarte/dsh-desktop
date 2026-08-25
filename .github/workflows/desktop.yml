@@ -136,9 +136,12 @@ jobs:
         # Manual pack bypasses electron-builder's OOMing nodeModulesCollector.
         # Produces dist/DeepSeek-Harness-<version>-linux-x64.tar.gz.
         run: pnpm run dist:linux
-      - name: Install flatpak-builder
+      - name: Install flatpak-builder + appstream-compose
         # flatpak-builder is not preinstalled on ubuntu-22.04 runners.
-        run: sudo apt-get update && sudo apt-get install -y flatpak-builder
+        # appstream-compose is required by flatpak-builder's cleanup stage
+        # to compose the AppStream catalog from the per-app metainfo; without
+        # it, bwrap fails with `execvp appstream-compose: No such file`.
+        run: sudo apt-get update && sudo apt-get install -y flatpak-builder appstream-compose
       - name: Add Flathub remote (user)
         # flatpak-builder --user (the default in flatpak-build.sh) installs
         # the Electron2 BaseApp + runtime into the user's flatpak install,
@@ -183,9 +186,9 @@ jobs:
           name: dsh-desktop-win
           path: artifacts/win
       - name: Download Linux artifact
-        uses: actions/download-artifact@v4
         with:
           name: dsh-desktop-linux
+          path: artifacts/linux
       - name: Zip Windows directory
         # Updater-free v0.1.1: ship the directory as a zip so users have
         # a single download artifact. Renamed from the raw dist output.
