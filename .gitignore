@@ -3,8 +3,8 @@ lib/
 *.tsbuildinfo
 build/stage/
 build/.deploy-tmp/
-build/.npm-stage/
 build/flatpak-out/
+flatpak/*.rendered.yml
 dist/
 .DS_Store
 .vscode/

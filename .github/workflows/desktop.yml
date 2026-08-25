@@ -98,6 +98,51 @@ jobs:
           name: dsh-desktop-win
           path: |
             dist/DeepSeek-Harness-*-win-x64/**
+          retention-days: 14
+
+  build-linux:
+    name: Build Linux (.flatpak)
+    runs-on: ubuntu-22.04
+    needs: typecheck-test
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: pnpm install --frozen-lockfile
+      - name: Download Electron binary
+        # electron's package.json exposes no install script — pnpm 10 won't
+        # auto-invoke it. We must run install.js ourselves to download the
+        # platform binary into node_modules/electron/dist/.
+        run: node node_modules/electron/install.js
+      - run: pnpm run build
+      - run: pnpm run icon:build
+      - name: Build Linux tarball
+        # Manual pack bypasses electron-builder's OOMing nodeModulesCollector.
+        # Produces dist/DeepSeek-Harness-<version>-linux-x64.tar.gz.
+        run: pnpm run dist:linux
+      - name: Install flatpak-builder
+        # flatpak-builder is not preinstalled on ubuntu-22.04 runners.
+        run: sudo apt-get update && sudo apt-get install -y flatpak-builder
+      - name: Add Flathub remote (user)
+        # flatpak-builder --user (the default in flatpak-build.sh) installs
+        # the Electron2 BaseApp + runtime into the user's flatpak install,
+        # so the remote must exist at the user level, not system.
+        run: flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+      - name: Build .flatpak bundle
+        # flatpak-build.sh renders ${VERSION}, runs flatpak-builder against
+        # the manifest, exports the OSTree repo, and bundles a .flatpak +
+        # repo.tar.gz. Uses --user because the runner is non-root.
+        run: pnpm run flatpak:build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dsh-desktop-linux
+          path: |
+            build/flatpak-out/DeepSeek-Harness-*.flatpak
+            build/flatpak-out/repo.tar.gz
           if-no-files-found: error
           retention-days: 14
 
@@ -110,7 +155,7 @@ jobs:
     # Auto-update is not wired in this release; downstream releases
     # will switch to electron-builder NSIS + dmg with proper manifests.
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-    needs: [build-mac, build-win]
+    needs: [build-mac, build-win, build-linux]
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -125,7 +170,11 @@ jobs:
         with:
           name: dsh-desktop-win
           path: artifacts/win
-      - name: Zip Windows directory
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dsh-desktop-linux
+          path: artifacts/linux
         # Updater-free v0.1.1: ship the directory as a zip so users have
         # a single download artifact. Renamed from the raw dist output.
         working-directory: artifacts/win
@@ -150,15 +199,5 @@ jobs:
             artifacts/mac/*.dmg
             artifacts/mac/latest-mac.yml
             artifacts/win/*.zip
+            artifacts/linux/*.flatpak
 
-  build-linux:
-    name: Build Linux (.flatpak)
-    # TODO(post-0.1.1): wire flatpak-builder, ostree export, and .flatpak
-    # upload. Linux release is intentionally deferred — leaving the job
-    # header so the file remains valid YAML and the release job can be
-    # added without re-litigating layout. Tracked separately.
-    if: false
-    runs-on: ubuntu-22.04
-    needs: typecheck-test
-    steps:
-      - run: echo "build-linux: deferred"

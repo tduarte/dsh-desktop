@@ -24,16 +24,19 @@ CLI browser would have opened.
 |---|---|---|---|
 | macOS | Terminal → Electron → child `dsh` | macOS Seatbelt (via `@deepseek-ai/dsh-shell`) | inherited from upstream unchanged |
 | Windows | NSIS installer → Electron → child `dsh` | Windows Job Objects (via `dsh-subprocess`) | inherited from upstream unchanged |
-| Linux (Flatpak) | Flatpak → Bubblewrap → child `dsh` | Bubblewrap; upstream Landlock profile skipped | wrapper sets `DSH_SANDBOX_DISABLED=1` |
+| Linux (Flatpak) | Flatpak → Bubblewrap → child `dsh` (via zypak) | Bubblewrap; Chromium setuid sandbox disabled | Electron2 BaseApp provides zypak, which places Chromium under the bwrap sandbox without the nested setuid sandbox |
 | Linux (no Flatpak) | unsandboxed | none | Flatpak is the supported Linux path |
 
-### Why `ELECTRON_DISABLE_SANDBOX=1`?
+### Why zypak + `--no-sandbox`?
 
-Chromium's setuid sandbox cannot double-nest with Flatpak's Bubblewrap — both
-want to manipulate the same setuid bits. Every Electron app on Flathub does
-this. The trust fence is Bubblewrap; Chromium's sandbox is the redundant
-inner layer that cannot be used here. The wrapper at
-`flatpak/wrapper.sh` sets the env var and passes `--no-sandbox` to electron.
+The Electron2 BaseApp (which the Flatpak manifest declares via `base` /
+`base-version`) ships `zypak-helper`: a tiny helper that places Chromium
+under Flatpak's Bubblewrap sandbox without Chromium's setuid sandbox — the
+two compete for the same setuid bits. The wrapper at `flatpak/wrapper.sh`
+invokes Electron via `zypak-wrapper.sh` and passes `--no-sandbox` to the
+Electron binary. The trust fence is Bubblewrap (provided by the Flatpak
+runtime) plus zypak; Chromium's own setuid sandbox is unused. Every
+Electron app on Flathub does this.
 
 ## Update channel
 
@@ -68,21 +71,30 @@ closure into a flat `node_modules/`. The script then:
 - copies `node_modules/@deepseek-ai/dsh-web-frontend/dist/` into
   `build/stage/dist/`.
 
-`electron-builder`'s `extraResources` then copies the staged tree to the
-packaged app's `resources/dsh/` and `resources/dist/`. On Flatpak, the same
-staged tree is consumed by `flatpak-builder`'s `stage` module, while the
-prebuilt Electron app archive (built by `electron-builder --linux --x64`) is
-pulled in as `extra-data` from the matching GitHub Release.
+`build/pack-linux.mjs` consumes the staged tree, plus the compiled Electron
+app (`lib/main.cjs`, `lib/preload.cjs`) and the Electron binary, and emits
+`dist/DeepSeek-Harness-<version>-linux-x64.tar.gz`. The flatpak manifest
+references this tarball as a plain local `file` source — flatpak-builder
+stages it at `/app/extra/dsh-desktop.tar.gz` and an `apply_extra` script
+(declared inline in the manifest) extracts it on the user's machine at
+install time.
 
 ## CI
 
 `.github/workflows/desktop.yml` runs a 3-OS matrix on PR/push and on `v*` tags.
-On tag pushes, the `release` job downloads all artifacts and uses
-`softprops/action-gh-release@v2` to attach them to the existing GitHub Release
-matching the tag. `latest.yml`, `latest-mac.yml`, `latest-linux.yml` are
-emitted by electron-builder alongside the binaries.
+`build-linux` runs on `ubuntu-22.04`: it installs `flatpak-builder` via apt,
+adds `flathub` as a user remote (so `--user` mode can resolve the
+`org.electronjs.Electron2.BaseApp//24.08` base), then invokes
+`pnpm run flatpak:build`. The default `--user` install lands the BaseApp
+runtime in `~/.local/share/flatpak/`, which is exactly what a non-root
+runner needs.
 
-## Signing roadmap
+On tag pushes, the `release` job downloads all three artifacts and uses
+`softprops/action-gh-release@v2` to attach them to the existing GitHub Release
+matching the tag. Linux artifacts: `DeepSeek-Harness-<v>.flatpak` (single-file
+install bundle) and `repo.tar.gz` (OSTree repo for `flatpak remote-add --from`).
+macOS artifacts: `DeepSeek Harness.app/**` plus `latest-mac.yml`. Windows
+artifact: `DeepSeek-Harness-<v>-win-x64.zip`.
 
 Code signing and notarization are deferred to a follow-up PR. macOS
 (`hardenedRuntime: false`, `gatekeeperAssess: false`), Windows

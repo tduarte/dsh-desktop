@@ -1,16 +1,25 @@
 #!/bin/sh
 # Wrapper for the bundled Electron app under Flatpak.
 #
-# Chromium's setuid sandbox cannot run inside Flatpak's Bubblewrap sandbox —
-# the two compete for the same setuid bits. Disable Chromium's; rely on
-# Bubblewrap for the trust fence. Every Electron app on Flathub does this.
+# The Electron2 BaseApp replaces Chromium's setuid sandbox with zypak:
+# it places the Electron binary under the bwrap sandbox without competing
+# for setuid bits. `zypak-wrapper.sh` is on $PATH (inherited from the
+# base at /app/bin).
 #
-# Also: route node module resolution to the Electron app's vendored tree.
+# Layout after install (apply_extra extracts the extra-data tarball):
+#   /app/dsh-desktop/
+#     electron-app/node_modules/.bin/electron
+#     electron-app/lib/main.cjs
+#     electron-app/lib/preload.cjs
+#     resources/dsh/   (bundled @deepseek-ai/dsh CLI)
+#     resources/dist/  (Vite frontend)
 
 set -eu
 
-export ELECTRON_DISABLE_SANDBOX=1
-export NODE_PATH=/app/dsh-desktop/node_modules
-export PATH=/app/dsh-desktop/node_modules/.bin:/usr/bin:/bin
+APP_DIR=/app/dsh-desktop
+ELECTRON="${APP_DIR}/electron-app/node_modules/.bin/electron"
 
-exec /app/dsh-desktop/node_modules/.bin/electron --no-sandbox /app/dsh-desktop "$@"
+exec zypak-wrapper.sh "${ELECTRON}" \
+  --no-sandbox \
+  "${APP_DIR}/electron-app" \
+  "$@"

@@ -4,25 +4,25 @@
 # Inputs:
 #   1. The prebuilt Electron archive (the `--tarball` argument) produced by
 #      `pnpm run dist:linux` (writes to `dist/DeepSeek-Harness-<version>-linux-x64.tar.gz`).
-#   2. `flatpak/io.github.tduarte.dsh-desktop.yml` — the Flatpak manifest with
-#      `REPLACE_WITH_SHA512` and `REPLACE_WITH_SIZE` placeholders.
+#   2. `flatpak/io.github.tduarte.dsh-desktop.yml` — the Flatpak manifest.
 #
 # This script:
-#   - Verifies the tarball exists and computes its sha512 + byte size.
-#   - Stages the tarball at `build/flatpak-out/dsh-desktop.tar.gz` (matching the
-#     manifest's `filename:` field).
-#   - Renders the manifest into a build-local copy with the placeholders filled
-#     in. The original manifest under `flatpak/` is never modified.
-#   - Runs `flatpak-builder` against the rendered manifest.
+#   - Renders a build-local copy of the manifest with `${VERSION}` substituted.
+#     The original manifest under `flatpak/` is never modified.
+#   - Runs `flatpak-builder` against the rendered manifest (which reads the
+#     tarball directly via a relative `path:` source).
 #   - Exports the OSTree repo at `<version>` and bundles it as a `.flatpak`.
 #   - Tars the OSTree repo so users can `flatpak remote-add --from repo.tar.gz`
 #     and `flatpak update`.
 #
 # Env:
-#   VERSION         app version (default: package.json#version)
-#   FLATPAK_REPO    output repo dir (default: build/flatpak-out/repo)
-#   FLATPAK_BUNDLE  output .flatpak (default: build/flatpak-out/DeepSeek-Harness-<version>.flatpak)
-
+#   VERSION                app version (default: package.json#version)
+#   FLATPAK_REPO           output repo dir (default: build/flatpak-out/repo)
+#   FLATPAK_BUNDLE         output .flatpak (default: build/flatpak-out/DeepSeek-Harness-<version>.flatpak)
+#   FLATPAK_USER_INSTALL   pass `1`/`true` to install deps into the user
+#                         flatpak install (default; required for non-root CI
+#                         runners). Pass `0`/`false` to install system-wide
+#                         (requires sudo / root).
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -36,8 +36,14 @@ FLATPAK_BUNDLE="${FLATPAK_BUNDLE:-${OUT_DIR}/DeepSeek-Harness-${VERSION}.flatpak
 MANIFEST_SRC="${REPO_ROOT}/flatpak/${APP_ID}.yml"
 MANIFEST_RENDERED="${REPO_ROOT}/flatpak/${APP_ID}.rendered.yml"
 
-echo "flatpak: version=${VERSION}"
-echo "flatpak: tarball=${TARBALL}"
+# Default to a user-mode flatpak install: CI runners are non-root, and
+# flatpak-builder's default `--system` requires sudo. Override by exporting
+# FLATPAK_USER_INSTALL=0 when running as root against a system install.
+FLATPAK_USER_INSTALL="${FLATPAK_USER_INSTALL:-1}"
+FLATPAK_BUILDER_USER_FLAG=()
+if [[ "${FLATPAK_USER_INSTALL}" =~ ^([1Tt][Rr]?[Uu]?[Ee]?|yes|on)$ ]]; then
+  FLATPAK_BUILDER_USER_FLAG=(--user)
+fi
 echo "flatpak: out=${OUT_DIR}"
 
 if ! command -v flatpak-builder >/dev/null; then
@@ -58,24 +64,16 @@ fi
 
 mkdir -p "${OUT_DIR}" "${FLATPAK_BUILD_DIR}"
 
-# Stage the tarball at the path the manifest's `filename:` field expects.
-cp "${TARBALL}" "${OUT_DIR}/dsh-desktop.tar.gz"
-
-# Compute sha512 + size.
-SHA512="$(sha512sum "${TARBALL}" | awk '{print $1}')"
-SIZE="$(stat --printf='%s' "${TARBALL}")"
-echo "flatpak: sha512=${SHA512}"
-echo "flatpak: size=${SIZE}"
-
-# Render the manifest: substitute placeholders.
+# Render the manifest: substitute ${VERSION}. (The tarball reference is a
+# plain `path:` source, so no placeholder substitution for its checksum.)
 sed \
-  -e "s|REPLACE_WITH_SHA512|${SHA512}|g" \
-  -e "s|REPLACE_WITH_SIZE|${SIZE}|g" \
   -e "s|\${VERSION}|${VERSION}|g" \
   "${MANIFEST_SRC}" > "${MANIFEST_RENDERED}"
 
+echo "flatpak: tarball=${TARBALL} ($(stat --printf='%s' "${TARBALL}") bytes)"
 echo "flatpak: flatpak-builder..."
 flatpak-builder --force-clean \
+  "${FLATPAK_BUILDER_USER_FLAG[@]}" \
   --install-deps-from=flathub \
   --repo="${FLATPAK_REPO}" \
   "${FLATPAK_BUILD_DIR}" \
@@ -83,19 +81,16 @@ flatpak-builder --force-clean \
 
 echo "flatpak: build-export..."
 flatpak build-export \
-  --runtime-url=https://dl.flathub.org/electron/ \
   "${FLATPAK_REPO}" \
   "${FLATPAK_BUILD_DIR}" \
   "${VERSION}"
 
 echo "flatpak: build-bundle..."
 flatpak build-bundle \
-  --runtime-url=https://dl.flathub.org/electron/ \
   "${FLATPAK_REPO}" \
   "${FLATPAK_BUNDLE}" \
+  "${APP_ID}" \
   "${VERSION}"
-
-# Tar the OSTree repo so users can `flatpak remote-add --from` for updates.
 echo "flatpak: taring repo..."
 tar -C "${FLATPAK_REPO}" -czf "${OUT_DIR}/repo.tar.gz" .
 

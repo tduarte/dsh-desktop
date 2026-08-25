@@ -59,9 +59,9 @@ DeepSeek Harness desktop app. Electron host shell that boots the upstream `@deep
 |---|---|
 | `src/` | Electron main (`main.ts`), preload (`preload.ts`), updater wrapper (`updater.ts`), shared types + URL regex (`types.ts`). |
 | `build/` | Staging + packaging scripts: `bundle-dsh.mjs` (stages upstream CLI/frontend), `build-icons.mjs` (renders `.icns`/`.ico`/multi-size `.png`), `pack-{mac,win,linux}.mjs` (manual pack, bypasses electron-builder's OOMing `nodeModulesCollector`), `flatpak-build.sh`. |
-| `flatpak/` | Linux Flatpak manifest (`io.github.tduarte.dsh-desktop.yml`), desktop entry, AppStream metainfo, `wrapper.sh` (sets `ELECTRON_DISABLE_SANDBOX=1` because Chromium's setuid sandbox cannot double-nest with Bubblewrap). |
+| `flatpak/` | Linux Flatpak manifest (`io.github.tduarte.dsh-desktop.yml`), desktop entry, AppStream metainfo, `wrapper.sh` (invokes Electron via `zypak-wrapper.sh` from the Electron2 BaseApp; passes `--no-sandbox`).
 | `tests/` | Vitest specs. Only the URL-detection pure functions are unit-tested; everything else is integration coverage via CI. |
-| `.github/workflows/` | `desktop.yml` — `typecheck-test`, `build-mac`, `build-win`, `release`, stubbed `build-linux` (deferred). |
+| `.github/workflows/` | `desktop.yml` — `typecheck-test`, `build-mac`, `build-win`, `build-linux`, `release`.
 | `lib/` | tsdown CJS output (`main.cjs`, `preload.cjs`). Gitignored. |
 | `dist/` | Pack script output (`.app`, win-x64 directory, linux tarball). Gitignored. |
 | `build/stage/` | Staged upstream `dsh` CLI + frontend. Gitignored. |
@@ -80,7 +80,7 @@ pnpm run test                          # vitest run
 pnpm run icon:build                    # render all packaging icon assets
 pnpm run dist:mac                      # produces dist/DeepSeek Harness.app (NO .dmg in v0.1.1)
 pnpm run dist:win                      # produces dist/DeepSeek-Harness-<v>-win-x64/ directory
-pnpm run dist:linux                    # produces .tar.gz for flatpak extra-data
+pnpm run dist:linux                    # produces .tar.gz consumed by flatpak-build.sh
 pnpm run flatpak:build                 # Linux only: .flatpak + repo.tar.gz
 
 # Inspect on CI / GitHub (use gh, not raw git+web):
@@ -114,15 +114,14 @@ gh release list --limit 5
 - `src/updater.ts` — `Updater` class wrapping `electron-updater`, 6h polling, gated install.
 - `src/types.ts` — `URL_DETECT_RE`, `detectUrl()`, `DshDesktopApi`, `UpdateEvent`, IPC channel const map. **Edit this first when adding IPC.**
 - `tsdown.config.js` — per-entry CJS bundling. Touching this requires understanding the preload sandboxing constraint.
-- `electron-builder.yml` — `appId: io.github.tduarte.dsh-desktop`, mac dmg x64+arm64, win nsis, **no Linux section by design** (flatpak-builder consumes the linux tarball as `extra-data`).
+- `electron-builder.yml` — `appId: io.github.tduarte.dsh-desktop`, mac dmg x64+arm64, win nsis, **no Linux section by design** (the flatpak is built from the linux tarball directly).
 - `app-update.yml` — electron-updater feed: `provider: github, owner: tduarte, repo: dsh-desktop, releaseType: release`. For v0.1.1 pre-release, manifests are absent by design (see "Release" below).
 - `build/bundle-dsh.mjs` — stages upstream `@deepseek-ai/dsh` (with flat `node_modules/` closure) and `@deepseek-ai/dsh-web-frontend` Vite dist into `build/stage/{dsh,dist}/`. Reuses pnpm-hoisted tree.
 - `build/pack-{mac,win,linux}.mjs` — manual pack. Each produces only the directory layout (`pack-mac.mjs` patches `Info.plist` CFBundle* keys to `package.json#version`); no installer in v0.1.1.
-- `flatpak/io.github.tduarte.dsh-desktop.yml` — runtime `org.electronjs.Electron2.BaseApp//24.08`, extra-data is the linux tarball, modules include `wrapper` (`flatpak/wrapper.sh`).
-- `flatpak/wrapper.sh` — sets `ELECTRON_DISABLE_SANDBOX=1`, `NODE_PATH=/app/dsh-desktop/node_modules`, execs `electron --no-sandbox /app/dsh-desktop`.
-- `flatpak/io.github.tduarte.dsh-desktop.metainfo.xml` — `<releases>` must be bumped on every release (currently 0.1.1-rc.2; needs 0.1.1 in this cut).
-- `.github/workflows/desktop.yml` — jobs: `typecheck-test` (ubuntu), `build-mac` (macos-latest), `build-win` (windows-latest), `release` (ubuntu, gated on tag push OR `workflow_dispatch`), `build-linux` stub (`if: false`, deferred).
-- `docs/desktop.md` — high-level design notes. Link, don't duplicate.
+- `flatpak/io.github.tduarte.dsh-desktop.yml` — `runtime: org.freedesktop.Platform`, `base: org.electronjs.Electron2.BaseApp`, `base-version: '24.08'`. Single `simple` buildsystem module installs icons, desktop, metainfo, the staged Linux tarball at `/app/extra/dsh-desktop.tar.gz`, an `apply_extra` script (extracts the tarball to `/app/dsh-desktop` at install time), and the launch wrapper at `/app/bin/dsh-desktop`.
+- `flatpak/wrapper.sh` — invokes `zypak-wrapper.sh <electron> --no-sandbox /app/dsh-desktop/electron-app`. zypak-helper is inherited from the BaseApp at `/app/bin`.
+- `flatpak/io.github.tduarte.dsh-desktop.metainfo.xml` — `<releases>` must be bumped on every release (currently `0.1.1`).
+- `.github/workflows/desktop.yml` — jobs: `typecheck-test` (ubuntu), `build-mac` (macos-latest), `build-win` (windows-latest), `build-linux` (ubuntu-22.04; installs flatpak-builder via apt, adds `flathub` user remote, runs `pnpm run flatpak:build`, uploads `.flatpak` + `repo.tar.gz`), `release` (ubuntu, gated on tag push OR `workflow_dispatch`, downloads all three artifacts and publishes via `softprops/action-gh-release@v2`).
 
 ## Runtime/Tooling Preferences
 
@@ -133,7 +132,6 @@ gh release list --limit 5
 - **No code signing / notarization** in this repo. macOS users right-click → Open; Windows users see a SmartScreen warning. Both deferred to a follow-up PR.
 - **Sandbox posture:**
   - macOS / Windows: standard Chromium sandbox.
-  - Linux under Flatpak: `ELECTRON_DISABLE_SANDBOX=1` in `flatpak/wrapper.sh` — Chromium's setuid sandbox cannot double-nest with Bubblewrap.
 
 ## Release
 
@@ -143,8 +141,8 @@ gh release list --limit 5
 - **v0.1.1 (current cut) is a manual-install pre-release:**
   - macOS: `DeepSeek Harness.app` (no `.dmg`, no `latest-mac.yml`).
   - Windows: `DeepSeek-Harness-0.1.1-win-x64.zip`.
-  - Auto-update is not wired — electron-updater needs `latest-mac.yml` / `latest.yml` and signed installers, which v0.1.1 deliberately omits. Downstream releases will switch to electron-builder NSIS + dmg with proper manifests.
-- **Linux:** `build-linux` job is a stub (`if: false`) with a TODO. flatpak-builder wiring is post-0.1.1.
+  - Linux: `DeepSeek-Harness-0.1.1.flatpak` + `repo.tar.gz`.
+- **Linux:** `build-linux` job runs flatpak-builder against the staged Linux tarball. The release uploads `DeepSeek-Harness-<v>.flatpak` (single-file bundle) and `repo.tar.gz` (OSTree repo, so users can `flatpak remote-add --from ...` then `flatpak update`).
 
 ## Testing & QA
 
@@ -159,7 +157,7 @@ gh release list --limit 5
 ## Sandbox posture
 
 - **macOS / Windows:** unchanged. Child `dsh` process keeps Landlock / Seatbelt / Job Objects.
-- **Linux under Flatpak:** Bubblewrap replaces Landlock. Wrapper sets `ELECTRON_DISABLE_SANDBOX=1` (Chromium's setuid sandbox cannot double-nest with Bubblewrap; every Electron app on Flathub does this).
+- **Linux under Flatpak:** Bubblewrap replaces Landlock. The wrapper launches Electron via `zypak-wrapper.sh` from the Electron2 BaseApp; Chromium's setuid sandbox is unused (it would compete with Bubblewrap for the same setuid bits; every Electron app on Flathub does this).
 
 ## When in doubt: Context7 MCP
 
