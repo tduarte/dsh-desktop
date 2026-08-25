@@ -1,14 +1,26 @@
 name: Desktop
-
 on:
   pull_request:
     branches: [main]
+    # Repo is a single-package monorepo at the root; paths must cover the
+    # directories this workflow actually depends on. `apps/desktop/**`
+    # would never trigger (no such dir exists in this repo).
     paths:
       - '.github/workflows/desktop.yml'
-      - 'apps/desktop/**'
+      - 'src/**'
+      - 'build/**'
+      - 'flatpak/**'
+      - 'docs/**'
+      - 'tests/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
+      - 'tsconfig*.json'
+      - 'tsdown.config.js'
+      - 'vitest.config.ts'
+      - 'electron-builder.yml'
+      - 'app-update.yml'
   push:
+    branches: [main]
     tags:
       - 'v*'
   workflow_dispatch:
