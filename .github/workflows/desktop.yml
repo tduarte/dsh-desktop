@@ -136,12 +136,18 @@ jobs:
         # Manual pack bypasses electron-builder's OOMing nodeModulesCollector.
         # Produces dist/DeepSeek-Harness-<version>-linux-x64.tar.gz.
         run: pnpm run dist:linux
-      - name: Install flatpak-builder + appstream-compose
-        # flatpak-builder is not preinstalled on ubuntu-22.04 runners.
-        # appstream-compose is required by flatpak-builder's cleanup stage
-        # to compose the AppStream catalog from the per-app metainfo; without
-        # it, bwrap fails with `execvp appstream-compose: No such file`.
-        run: sudo apt-get update && sudo apt-get install -y flatpak-builder appstream-compose
+      - name: Install flatpak-builder (>= 1.4.4 from Flathub PPA)
+        # Ubuntu 22.04 ships flatpak-builder 1.2.x, which calls the
+        # now-removed `appstream-compose` binary during the cleanup
+        # stage and fails with `bwrap: execvp appstream-compose: No
+        # such file`. flatpak-builder >= 1.4.4 (Flathub stable PPA)
+        # uses `appstreamcli compose` instead. Also pull appstream for
+        # the AppStream tooling that ships with the newer flatpak-builder.
+        run: |
+          sudo apt-get update
+          sudo add-apt-repository -y ppa:flatpak/stable
+          sudo apt-get update
+          sudo apt-get install -y flatpak-builder appstream
       - name: Add Flathub remote (user)
         # flatpak-builder --user (the default in flatpak-build.sh) installs
         # the Electron2 BaseApp + runtime into the user's flatpak install,
