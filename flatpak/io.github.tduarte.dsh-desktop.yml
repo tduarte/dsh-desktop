@@ -1,27 +1,41 @@
 app-id: io.github.tduarte.dsh-desktop
-runtime: org.electronjs.Electron2.BaseApp
+# BaseApp provides the prebuilt Electron runtime + zypak sandbox, shared
+# across every Electron flatpak on Flathub. We ship our own Electron app
+# archive (built by pnpm run dist:linux) as extra-data; the wrapper uses
+# zypak-wrapper.sh (inherited from the base at /app/bin) to launch it.
+# https://docs.flatpak.org/en/latest/electron.html
+#
+# The extra-data tarball (build/pack-linux.mjs) bundles everything:
+#   - Electron binary (node_modules/.bin/electron)
+#   - compiled lib/main.cjs + lib/preload.cjs
+#   - bundled @deepseek-ai/dsh CLI + Vite frontend in resources/
+runtime: org.freedesktop.Platform
 runtime-version: '24.08'
-sdk: org.electronjs.Electron2.BaseApp//24.08
+sdk: org.freedesktop.Sdk
+base: org.electronjs.Electron2.BaseApp
+base-version: '24.08'
 command: dsh-desktop
 
 finish-args:
-  # Display
+  # Display: Electron 28+ has working Wayland support; sample app keeps X11
+  # as the default and lets users opt into Wayland per launch.
+  # https://docs.flatpak.org/en/latest/electron.html#sandbox-permissions
+  - --share=ipc
   - --socket=wayland
   - --socket=fallback-x11
-  # Audio
   - --socket=pulseaudio
-  # D-Bus
   - --socket=session-bus
+  - --share=network
   # Filesystem
   - --filesystem=home
   - --filesystem=xdg-run/dsh:create
   - --filesystem=xdg-config/dsh:create
   - --filesystem=/tmp:create
-  # IPC / network
-  - --share=network
-  - --share=ipc
-  # Environment: route the harness's $DSH_HOME into the per-app data dir.
+  # Environment
   - --env=DSH_HOME=xdg-data/dsh
+  # Wayland HiDPI cursor scaling requires XCURSOR_PATH from host
+  - --env=XCURSOR_PATH=/run/host/user-share/icons:/run/host/share/icons
+  - --env=ELECTRON_TRASH=gio
   # Notifications + system tray
   - --talk-name=org.freedesktop.Notifications
   - --talk-name=org.kde.StatusNotifierWatcher
@@ -29,72 +43,56 @@ finish-args:
   - --own-name=io.github.tduarte.dsh-desktop
 
 modules:
-  - name: stage
-    type: file
-    sources:
-      - type: file
-        path: ../build/stage/dsh
-        dest: dsh
-      - type: file
-        path: ../build/stage/dist
-        dest: dist
-
-  - name: electron-shell
-    type: extra-data
-    sources:
-      - type: file
-        path: ../dist/DeepSeek-Harness-${VERSION}-linux-x64.tar.gz
-        dest: dsh-desktop.tar.gz
-    # Pre-bundled tarball lives next to the manifest in the build dir; flatpak-builder
-    # reads it as a local file source rather than fetching from the URL at build time.
-    # The release URL is documented in the cook-book for end-user OSTree updates.
-    sha512: REPLACE_WITH_SHA512
-    size: REPLACE_WITH_SIZE
-
-  - name: desktop-file
-    type: file
+  # Desktop integration assets + Electron archive staging + launch wrapper.
+  # The "build" is just `install -D` of prebuilt artifacts; nothing compiles.
+  - name: dsh-desktop
+    buildsystem: simple
+    build-commands:
+      # Desktop file, AppStream metadata, hicolor icons.
+      # flatpak-builder flattens file sources into the build cwd using their
+      # basename, so install -Dm644 <basename> /app/<path>/<basename>.
+      - install -Dm644 io.github.tduarte.dsh-desktop.desktop /app/share/applications/io.github.tduarte.dsh-desktop.desktop
+      - install -Dm644 io.github.tduarte.dsh-desktop.metainfo.xml /app/share/metainfo/io.github.tduarte.dsh-desktop.metainfo.xml
+      - install -Dm644 icon-16.png /app/share/icons/hicolor/16x16/apps/io.github.tduarte.dsh-desktop.png
+      - install -Dm644 icon-32.png /app/share/icons/hicolor/32x32/apps/io.github.tduarte.dsh-desktop.png
+      - install -Dm644 icon-48.png /app/share/icons/hicolor/48x48/apps/io.github.tduarte.dsh-desktop.png
+      - install -Dm644 icon-64.png /app/share/icons/hicolor/64x64/apps/io.github.tduarte.dsh-desktop.png
+      - install -Dm644 icon-128.png /app/share/icons/hicolor/128x128/apps/io.github.tduarte.dsh-desktop.png
+      - install -Dm644 icon-256.png /app/share/icons/hicolor/256x256/apps/io.github.tduarte.dsh-desktop.png
+      - install -Dm644 icon-512.png /app/share/icons/hicolor/512x512/apps/io.github.tduarte.dsh-desktop.png
+      # Stage the Electron app archive at /app/extra/. apply_extra (installed
+      # below) extracts it on the user's machine at install time.
+      - install -Dm644 DeepSeek-Harness-${VERSION}-linux-x64.tar.gz /app/extra/dsh-desktop.tar.gz
+      # Install-time extractor and launch wrapper.
+      - install -Dm755 apply_extra /app/bin/apply_extra
+      - install -Dm755 wrapper.sh /app/bin/dsh-desktop
     sources:
       - type: file
         path: io.github.tduarte.dsh-desktop.desktop
-        dest: share/applications/
-
-  - name: metainfo
-    type: file
-    sources:
       - type: file
         path: io.github.tduarte.dsh-desktop.metainfo.xml
-        dest: share/metainfo/
-
-  - name: icons
-    type: file
-    sources:
       - type: file
         path: ../build/icon-16.png
-        dest: share/icons/hicolor/16x16/apps/io.github.tduarte.dsh-desktop.png
       - type: file
         path: ../build/icon-32.png
-        dest: share/icons/hicolor/32x32/apps/io.github.tduarte.dsh-desktop.png
       - type: file
         path: ../build/icon-48.png
-        dest: share/icons/hicolor/48x48/apps/io.github.tduarte.dsh-desktop.png
       - type: file
         path: ../build/icon-64.png
-        dest: share/icons/hicolor/64x64/apps/io.github.tduarte.dsh-desktop.png
       - type: file
         path: ../build/icon-128.png
-        dest: share/icons/hicolor/128x128/apps/io.github.tduarte.dsh-desktop.png
       - type: file
         path: ../build/icon-256.png
-        dest: share/icons/hicolor/256x256/apps/io.github.tduarte.dsh-desktop.png
       - type: file
         path: ../build/icon-512.png
-        dest: share/icons/hicolor/512x512/apps/io.github.tduarte.dsh-desktop.png
-
-  - name: wrapper
-    type: script
-    build-commands:
-      - install -Dm 0755 wrapper.sh /app/bin/dsh-desktop
-    sources:
+      - type: file
+        path: ../dist/DeepSeek-Harness-${VERSION}-linux-x64.tar.gz
+      - type: script
+        dest-filename: apply_extra
+        commands:
+          - mkdir -p /app/dsh-desktop
+          - tar -xzf /app/extra/dsh-desktop.tar.gz -C /app/dsh-desktop --strip-components=1
+          - rm -f /app/extra/dsh-desktop.tar.gz
       - type: file
         path: wrapper.sh
 

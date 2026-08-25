@@ -32,7 +32,7 @@
   <launchable type="desktop-id">io.github.tduarte.dsh-desktop.desktop</launchable>
   <content_rating type="oars-1.1" />
   <releases>
-    <release version="0.1.1-rc.2" date="2026-08-24">
+    <release version="0.1.1" date="2026-08-24">
       <description>
         <p>Initial desktop release: macOS DMG, Windows NSIS, Linux Flatpak.</p>
       </description>
