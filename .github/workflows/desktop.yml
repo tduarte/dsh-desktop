@@ -186,7 +186,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: dsh-desktop-linux
-          path: artifacts/linux
+      - name: Zip Windows directory
         # Updater-free v0.1.1: ship the directory as a zip so users have
         # a single download artifact. Renamed from the raw dist output.
         working-directory: artifacts/win
