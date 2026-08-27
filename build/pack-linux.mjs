@@ -7,19 +7,23 @@
  * we have access to (~865 hoisted packages materializing as one giant JSON
  * object). The collector is hardcoded: there is no env var or config key
  * to skip it in v26.x. Pivoting off electron-builder for Linux entirely.
- *
  * Output:
  *   dist/DeepSeek-Harness-<version>-linux-x64.tar.gz
  *     - DeepSeek Harness-linux-x64/
- *       - electron-app/      (Electron binary + lib/main.cjs + lib/preload.cjs)
- *       - resources/dsh/     (bundled CLI)
- *       - resources/dist/    (frontend Vite output)
+ *       - electron-app/node_modules/electron/dist/
+ *         - dsh-desktop         (Electron binary, renamed so app.isPackaged is true)
+ *         - resources/app/      (package.json + lib/main.cjs + lib/preload.cjs)
+ *         - resources/dsh/      (bundled CLI)
+ *         - resources/dist/     (frontend Vite output)
  *
- * The flatpak manifest references this tarball under `extra-data`. See
+ * Electron computes process.resourcesPath as <exe_dir>/resources and
+ * app.isPackaged from the executable basename (must not be "electron"),
+ * so src/main.ts#resolveDshBin() resolves resources/dsh/lib/bin.js.
+ * The flatpak manifest extracts this tarball at build time. See
  * flatpak/io.github.tduarte.dsh-desktop.yml.
  */
 
-import { cp, mkdir, readFile, rm, stat } from 'node:fs/promises'
+import { cp, mkdir, readFile, rename, rm, stat } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -48,47 +52,33 @@ async function assertExists(path, label) {
 
 async function main() {
   await assertExists(electronSource, 'Electron dist')
-  await assertExists(libSource, 'lib/')
-  await assertExists(stageDshSource, 'bundled CLI stage')
-  await assertExists(stageDistSource, 'bundled frontend stage')
-
-  // Stage a directory that mirrors what electron-builder would have produced.
+  // Stage a layout Electron recognizes as "packaged": executable renamed
+  // away from "electron" (app.isPackaged === true) and the app payload under
+  // <exe_dir>/resources/, matching what electron-builder emits.
   const stagingRoot = join(distDir, 'DeepSeek Harness-linux-x64')
   if (existsSync(stagingRoot)) await rm(stagingRoot, { recursive: true, force: true })
-  await mkdir(join(stagingRoot, 'electron-app', 'node_modules', 'electron'), { recursive: true })
-  await mkdir(join(stagingRoot, 'electron-app', 'node_modules', 'app-builder-lib'), { recursive: true })
-  await mkdir(join(stagingRoot, 'electron-app', 'lib'), { recursive: true })
-  await mkdir(join(stagingRoot, 'resources', 'dsh'), { recursive: true })
-  await mkdir(join(stagingRoot, 'resources', 'dist'), { recursive: true })
+  const electronDist = join(stagingRoot, 'electron-app', 'node_modules', 'electron', 'dist')
+  await mkdir(join(electronDist, 'resources', 'app'), { recursive: true })
 
   process.stdout.write('pack-linux: copying Electron distribution\n')
-  await cp(electronSource, join(stagingRoot, 'electron-app', 'node_modules', 'electron', 'dist'), {
-    recursive: true,
-    dereference: true,
-  })
-  // Copy only the runtime bits Electron actually loads. The full Electron
-  // dist (Frameworks, Helpers, *.so) is ~280 MB; this is what an end user
-  // would download anyway.
-  await cp(join(repoRoot, 'node_modules', 'electron', 'package.json'),
-           join(stagingRoot, 'electron-app', 'node_modules', 'electron', 'package.json'))
-
-  process.stdout.write('pack-linux: copying compiled main.cjs + preload.cjs\n')
-  await cp(libSource, join(stagingRoot, 'electron-app', 'lib'), {
+  await cp(electronSource, electronDist, {
     recursive: true,
     dereference: true,
   })
 
-  process.stdout.write('pack-linux: copying bundled CLI + frontend\n')
-  await cp(stageDshSource, join(stagingRoot, 'resources', 'dsh'), {
+  // Rename the executable: Electron only treats itself as packaged when the
+  // basename is not "electron". This makes process.resourcesPath point at
+  // electron-app/node_modules/electron/dist/resources.
+  const electronBin = join(electronDist, 'electron')
+  const renamedBin = join(electronDist, 'dsh-desktop')
+  await rename(electronBin, renamedBin)
+  process.stdout.write('pack-linux: renamed electron -> dsh-desktop\n')
+  // app payload: package.json + compiled main.cjs/preload.cjs, resolved via
+  // process.resourcesPath/app by Electron's packaged-mode loader.
+  await cp(libSource, join(electronDist, 'resources', 'app', 'lib'), {
     recursive: true,
     dereference: true,
   })
-  await cp(stageDistSource, join(stagingRoot, 'resources', 'dist'), {
-    recursive: true,
-    dereference: true,
-  })
-
-  // Generate a minimal package.json that points main at lib/main.cjs.
   const pkg = {
     name: '@deepseek-ai/dsh-desktop',
     version,
@@ -96,9 +86,19 @@ async function main() {
   }
   const { writeFile } = await import('node:fs/promises')
   await writeFile(
-    join(stagingRoot, 'electron-app', 'package.json'),
+    join(electronDist, 'resources', 'app', 'package.json'),
     JSON.stringify(pkg, null, 2),
   )
+
+  process.stdout.write('pack-linux: copying bundled CLI + frontend\n')
+  await cp(stageDshSource, join(electronDist, 'resources', 'dsh'), {
+    recursive: true,
+    dereference: true,
+  })
+  await cp(stageDistSource, join(electronDist, 'resources', 'dist'), {
+    recursive: true,
+    dereference: true,
+  })
 
   process.stdout.write('pack-linux: creating tarball (gzip)\n')
   await mkdir(distDir, { recursive: true })
