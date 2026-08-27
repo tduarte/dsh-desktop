@@ -196,6 +196,19 @@ jobs:
         with:
           name: dsh-desktop-linux
           path: artifacts/linux
+      - name: Zip macOS .app bundle
+        # Updater-free v0.1.1: ship the .app as a zip (single download, no
+        # per-file asset spray). Renamed from the raw dist output.
+        working-directory: artifacts/mac
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          app=(DeepSeek\ Harness.app)
+          if [ ! -d "${app[0]}" ]; then
+            echo "expected DeepSeek Harness.app in artifacts/mac" >&2
+            exit 1
+          fi
+          zip -qry DeepSeek-Harness-mac.zip "${app[0]}"
       - name: Zip Windows directory
         # Updater-free v0.1.1: ship the directory as a zip so users have
         # a single download artifact. Renamed from the raw dist output.
@@ -217,9 +230,7 @@ jobs:
           generate_release_notes: true
           prerelease: true
           files: |
-            artifacts/mac/DeepSeek Harness.app/**
-            artifacts/mac/*.dmg
-            artifacts/mac/latest-mac.yml
+            artifacts/mac/DeepSeek-Harness-mac.zip
             artifacts/win/*.zip
             artifacts/linux/*.flatpak
-
+            artifacts/linux/repo.tar.gz
