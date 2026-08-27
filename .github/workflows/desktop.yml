@@ -228,7 +228,7 @@ jobs:
           tag_name: v0.1.1
           name: v0.1.1
           generate_release_notes: true
-          prerelease: true
+          prerelease: false
           files: |
             artifacts/mac/DeepSeek-Harness-mac.zip
             artifacts/win/*.zip
