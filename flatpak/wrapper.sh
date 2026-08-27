@@ -6,20 +6,14 @@
 # for setuid bits. `zypak-wrapper.sh` is on $PATH (inherited from the
 # base at /app/bin).
 #
-# Layout after install (apply_extra extracts the extra-data tarball):
+# Layout after install (the manifest extracts the tarball at build time):
 #   /app/dsh-desktop/
-#     electron-app/node_modules/.bin/electron
-#     electron-app/lib/main.cjs
-#     electron-app/lib/preload.cjs
-#     resources/dsh/   (bundled @deepseek-ai/dsh CLI)
-#     resources/dist/  (Vite frontend)
-
-set -eu
-
+#     electron-app/node_modules/electron/dist/dsh-desktop  (Electron binary)
+#     electron-app/node_modules/electron/dist/resources/   (app payload)
+#
 APP_DIR=/app/dsh-desktop
-ELECTRON="${APP_DIR}/electron-app/node_modules/.bin/electron"
+ELECTRON="${APP_DIR}/electron-app/node_modules/electron/dist/dsh-desktop"
 
 exec zypak-wrapper.sh "${ELECTRON}" \
   --no-sandbox \
-  "${APP_DIR}/electron-app" \
   "$@"

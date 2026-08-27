@@ -242,6 +242,7 @@ class HarnessDesktopApp {
       if (url !== null && this.window === null) {
         debug(`opening BrowserWindow at ${url}`)
         this.window = new BrowserWindow({
+          autoHideMenuBar: true,
           width: 1280,
           height: 800,
           show: true,

@@ -5,8 +5,8 @@ app-id: io.github.tduarte.dsh-desktop
 # zypak-wrapper.sh (inherited from the base at /app/bin) to launch it.
 # https://docs.flatpak.org/en/latest/electron.html
 #
-# The extra-data tarball (build/pack-linux.mjs) bundles everything:
-#   - Electron binary (node_modules/.bin/electron)
+# The Electron app tarball (build/pack-linux.mjs) is extracted at build time:
+#   - Electron binary (node_modules/electron/dist/electron)
 #   - compiled lib/main.cjs + lib/preload.cjs
 #   - bundled @deepseek-ai/dsh CLI + Vite frontend in resources/
 runtime: org.freedesktop.Platform
@@ -21,8 +21,9 @@ finish-args:
   # as the default and lets users opt into Wayland per launch.
   # https://docs.flatpak.org/en/latest/electron.html#sandbox-permissions
   - --share=ipc
-  - --socket=wayland
+  - --device=dri
   - --socket=fallback-x11
+  - --socket=wayland
   - --socket=pulseaudio
   - --socket=session-bus
   - --share=network
@@ -60,11 +61,12 @@ modules:
       - install -Dm644 icon-128.png /app/share/icons/hicolor/128x128/apps/io.github.tduarte.dsh-desktop.png
       - install -Dm644 icon-256.png /app/share/icons/hicolor/256x256/apps/io.github.tduarte.dsh-desktop.png
       - install -Dm644 icon-512.png /app/share/icons/hicolor/512x512/apps/io.github.tduarte.dsh-desktop.png
-      # Stage the Electron app archive at /app/extra/. apply_extra (installed
-      # below) extracts it on the user's machine at install time.
-      - install -Dm644 DeepSeek-Harness-${VERSION}-linux-x64.tar.gz /app/extra/dsh-desktop.tar.gz
-      # Install-time extractor and launch wrapper.
-      - install -Dm755 apply_extra /app/bin/apply_extra
+      # Extract the prebuilt Electron app tarball directly into the app
+      # prefix. Bundles built with `flatpak build-bundle` ship the extracted
+      # tree, so no extra-data/apply_extra round-trip is needed.
+      - mkdir -p /app/dsh-desktop
+      - tar -xzf DeepSeek-Harness-${VERSION}-linux-x64.tar.gz -C /app/dsh-desktop --strip-components=1
+      # Launch wrapper.
       - install -Dm755 wrapper.sh /app/bin/dsh-desktop
     sources:
       - type: file
@@ -87,12 +89,6 @@ modules:
         path: ../build/icon-512.png
       - type: file
         path: ../dist/DeepSeek-Harness-${VERSION}-linux-x64.tar.gz
-      - type: script
-        dest-filename: apply_extra
-        commands:
-          - mkdir -p /app/dsh-desktop
-          - tar -xzf /app/extra/dsh-desktop.tar.gz -C /app/dsh-desktop --strip-components=1
-          - rm -f /app/extra/dsh-desktop.tar.gz
       - type: file
         path: wrapper.sh
 
