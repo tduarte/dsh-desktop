@@ -1,6 +1,6 @@
 # dsh-desktop
 
-DeepSeek Harness desktop app. Electron host shell that boots the upstream `@deepseek-ai/dsh` webserver and renders it in a native window.
+DSH Desktop — an Electron desktop shell for DeepSeek Harness (dsh). Electron host shell that boots the upstream `@deepseek-ai/dsh` webserver and renders it in a native window.
 
 - **macOS** — `.dmg` (unsigned in this PR)
 - **Windows** — `.exe` NSIS installer (unsigned in this PR)
@@ -12,7 +12,7 @@ Auto-updates from GitHub Releases.
 
 ### macOS
 
-Download the latest `.dmg` from [Releases](https://github.com/tduarte/dsh-desktop/releases), open it, drag **DeepSeek Harness** to Applications. First launch shows Gatekeeper's "unidentified developer" warning — right-click → Open, then confirm. Code signing is a follow-up PR.
+Download the latest `.dmg` from [Releases](https://github.com/tduarte/dsh-desktop/releases), open it, drag **DSH Desktop** to Applications. First launch shows Gatekeeper's "unidentified developer" warning — right-click → Open, then confirm. Code signing is a follow-up PR.
 
 ### Windows
 

@@ -1,5 +1,5 @@
 /**
- * Electron main process for DeepSeek Harness desktop.
+ * Electron main process for DSH Desktop.
  *
  * Lifecycle:
  *   1. Acquire single-instance lock; second launches focus the existing window.
@@ -228,7 +228,7 @@ class HarnessDesktopApp {
     debug(`dshBin=${dshBin}`)
     if (!existsSync(dshBin)) {
       void dialog.showErrorBox(
-        'DeepSeek Harness desktop',
+        'DSH Desktop',
         `dsh binary not found at ${dshBin}. The install may be corrupted; please reinstall.`,
       )
       app.quit()
@@ -265,7 +265,7 @@ class HarnessDesktopApp {
       debug(`child exit code=${String(code)}`)
       if (code !== 0 && code !== null && this.window === null && !this.shuttingDown) {
         void dialog.showErrorBox(
-          'DeepSeek Harness failed to start',
+          'DSH Desktop failed to start',
           `The dsh webserver exited with code ${String(code)} before the UI was ready.\n\nLast stderr:\n${supervisor.lastStderr}`,
         )
         app.quit()

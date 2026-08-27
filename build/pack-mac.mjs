@@ -48,7 +48,7 @@ async function main() {
   await assertExists(stageDshSource, 'bundled CLI stage')
   await assertExists(stageDistSource, 'bundled frontend stage')
 
-  const appBundle = join(distDir, 'DeepSeek Harness.app')
+  const appBundle = join(distDir, 'DSH Desktop.app')
   if (existsSync(appBundle)) await rm(appBundle, { recursive: true, force: true })
   await mkdir(join(appBundle, 'Contents', 'Resources'), { recursive: true })
 
@@ -105,23 +105,21 @@ async function main() {
         `<key>CFBundleShortVersionString</key><string>${version}</string>`,
       )
       .replace(
-        /<key>CFBundleName<\/key>\s*<string>[^<]+<\/string>/,
-        '<key>CFBundleName</key><string>DeepSeek Harness</string>',
+        '<key>CFBundleName</key><string>DSH Desktop</string>',
       )
       .replace(
         /<key>CFBundleIdentifier<\/key>\s*<string>[^<]+<\/string>/,
         '<key>CFBundleIdentifier</key><string>io.github.tduarte.dsh-desktop</string>',
       )
       .replace(
-        /<key>CFBundleExecutable<\/key>\s*<string>[^<]+<\/string>/,
-        '<key>CFBundleExecutable</key><string>DeepSeek Harness</string>',
+        '<key>CFBundleExecutable</key><string>DSH Desktop</string>',
       )
     if (newPlist !== plistSrc) {
       await plist.writeFile(infoPlistPath, newPlist, 'utf8')
     }
     // Rename the executable to match CFBundleExecutable
     const oldExec = join(appBundle, 'Contents', 'MacOS', 'Electron')
-    const newExec = join(appBundle, 'Contents', 'MacOS', 'DeepSeek Harness')
+    const newExec = join(appBundle, 'Contents', 'MacOS', 'DSH Desktop')
     try {
       await import('node:fs/promises').then(m => m.rename(oldExec, newExec))
     } catch { /* ignore */ }

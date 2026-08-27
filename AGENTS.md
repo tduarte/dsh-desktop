@@ -1,6 +1,6 @@
 # Repository Guidelines
 
-DeepSeek Harness desktop app. Electron host shell that boots the upstream `@deepseek-ai/dsh` webserver in a child process and renders it in a `BrowserWindow`. Pinned to Node `>=22`, pnpm `10.18`. ESM source, CJS output.
+DSH Desktop — Electron desktop shell for DeepSeek Harness. Boots the upstream `@deepseek-ai/dsh` webserver as a child process and that boots the upstream `@deepseek-ai/dsh` webserver in a child process and renders it in a `BrowserWindow`. Pinned to Node `>=22`, pnpm `10.18`. ESM source, CJS output.
 
 ## Project Overview
 
@@ -78,7 +78,7 @@ pnpm run test                          # vitest run
 
 # Per-OS packaging (manual pack, not electron-builder):
 pnpm run icon:build                    # render all packaging icon assets
-pnpm run dist:mac                      # produces dist/DeepSeek Harness.app (NO .dmg in v0.1.1)
+pnpm run dist:mac                      # produces dist/DSH Desktop.app (NO .dmg in v0.1.1)
 pnpm run dist:win                      # produces dist/DeepSeek-Harness-<v>-win-x64/ directory
 pnpm run dist:linux                    # produces .tar.gz consumed by flatpak-build.sh
 pnpm run flatpak:build                 # Linux only: .flatpak + repo.tar.gz
@@ -104,7 +104,7 @@ gh release list --limit 5
 - **IPC channel names live in `src/types.ts`** as a const map — never inline string literals in `ipcMain`/`webContents.send`/`contextBridge`. Adding a channel means editing `types.ts` first.
 - **Shared types in `src/types.ts`:** `DshDesktopApi` interface (the `window.dshDesktop` shape), `UpdateEvent` discriminated union, `URL_DETECT_RE` regex, `detectUrl()` pure function.
 - **Error handling on child exit:** last 4 KiB of stderr surfaced in a dialog before quit — preserve this on any new spawn path.
-- **Single-instance lock is mandatory** — second `open DeepSeek Harness.app` focuses the existing window. Never bypass `app.requestSingleInstance` for fast path development.
+- **Single-instance lock is mandatory** — second `open DSH Desktop.app` focuses the existing window. Never bypass `app.requestSingleInstance` for fast path development.
 - **`.npmrc` declares `node-linker=hoisted` + `shamefully-hoist=true` + `public-hoist-pattern[]=*`** — full hoist treatment required for Electron / electron-builder / native modules under pnpm 10. Do not change.
 
 ## Important Files
@@ -139,7 +139,7 @@ gh release list --limit 5
 - **Trigger:** `push: tags: ['v*']` on `main` OR `workflow_dispatch` (manual via `gh workflow run desktop.yml --ref v0.1.1`).
 - **Release job** downloads mac/win artifacts, zips the Windows directory, and publishes via `softprops/action-gh-release@v2` with `prerelease: true` and `generate_release_notes: true`.
 - **v0.1.1 (current cut) is a manual-install pre-release:**
-  - macOS: `DeepSeek Harness.app` (no `.dmg`, no `latest-mac.yml`).
+  - macOS: `DSH Desktop.app` (no `.dmg`, no `latest-mac.yml`).
   - Windows: `DeepSeek-Harness-0.1.1-win-x64.zip`.
   - Linux: `DeepSeek-Harness-0.1.1.flatpak` + `repo.tar.gz`.
 - **Linux:** `build-linux` job runs flatpak-builder against the staged Linux tarball. The release uploads `DeepSeek-Harness-<v>.flatpak` (single-file bundle) and `repo.tar.gz` (OSTree repo, so users can `flatpak remote-add --from ...` then `flatpak update`).

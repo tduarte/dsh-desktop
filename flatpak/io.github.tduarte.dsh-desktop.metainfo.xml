@@ -3,11 +3,11 @@
   <id>io.github.tduarte.dsh-desktop</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
-  <name>DeepSeek Harness</name>
+  <name>DSH Desktop</name>
   <summary>Local-first AI agent harness with a desktop UI</summary>
   <description>
     <p>
-      DeepSeek Harness is a local-first AI agent platform: a Cordis plugin
+      DSH Desktop is a local-first AI agent platform: a Cordis plugin
       graph, persistent sessions, and a desktop UI that talks to a Node
       webserver child process.
     </p>

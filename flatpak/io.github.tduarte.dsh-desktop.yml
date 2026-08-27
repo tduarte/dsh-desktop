@@ -65,7 +65,7 @@ modules:
       # prefix. Bundles built with `flatpak build-bundle` ship the extracted
       # tree, so no extra-data/apply_extra round-trip is needed.
       - mkdir -p /app/dsh-desktop
-      - tar -xzf DeepSeek-Harness-${VERSION}-linux-x64.tar.gz -C /app/dsh-desktop --strip-components=1
+      - tar -xzf DSH-Desktop-${VERSION}-linux-x64.tar.gz -C /app/dsh-desktop --strip-components=1
       # Launch wrapper.
       - install -Dm755 wrapper.sh /app/bin/dsh-desktop
     sources:
@@ -88,7 +88,7 @@ modules:
       - type: file
         path: ../build/icon-512.png
       - type: file
-        path: ../dist/DeepSeek-Harness-${VERSION}-linux-x64.tar.gz
+        path: ../dist/DSH-Desktop-${VERSION}-linux-x64.tar.gz
       - type: file
         path: wrapper.sh
 

@@ -7,7 +7,7 @@
  * directory + a future signed NSIS wrapper or a simple zip artifact.
  *
  * Output:
- *   dist/DeepSeek-Harness-<version>-win-x64/
+ *   dist/DSH-Desktop-<version>-win-x64/
  *     electron.exe                    (the Electron binary)
  *     resources.pak                   (Electron resources)
  *     *.dll                           (Chromium DLLs)
@@ -55,7 +55,7 @@ async function main() {
   await assertExists(stageDshSource, 'bundled CLI stage')
   await assertExists(stageDistSource, 'bundled frontend stage')
 
-  const outDir = join(distDir, `DeepSeek-Harness-${version}-win-x64`)
+  const outDir = join(distDir, `DSH-Desktop-${version}-win-x64`)
   if (existsSync(outDir)) await rm(outDir, { recursive: true, force: true })
   await mkdir(join(outDir, 'resources', 'app'), { recursive: true })
 

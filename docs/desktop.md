@@ -93,7 +93,7 @@ On tag pushes, the `release` job downloads all three artifacts and uses
 `softprops/action-gh-release@v2` to attach them to the existing GitHub Release
 matching the tag. Linux artifacts: `DeepSeek-Harness-<v>.flatpak` (single-file
 install bundle) and `repo.tar.gz` (OSTree repo for `flatpak remote-add --from`).
-macOS artifacts: `DeepSeek Harness.app/**` plus `latest-mac.yml`. Windows
+macOS artifacts: `DSH Desktop.app/**` plus `latest-mac.yml`. Windows
 artifact: `DeepSeek-Harness-<v>-win-x64.zip`.
 
 Code signing and notarization are deferred to a follow-up PR. macOS

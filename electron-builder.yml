@@ -9,7 +9,7 @@
 # Windows: SmartScreen warns. Both land in a follow-up PR.
 
 appId: io.github.tduarte.dsh-desktop
-productName: DeepSeek Harness
+productName: DSH Desktop
 copyright: Copyright © 2026 DeepSeek
 asar: true
 directories:
