@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-desktop",
-  "description": "DeepSeek Harness desktop app: Electron host shell for the dsh webserver, packaged for macOS, Windows, and Linux (Flatpak). Auto-updates from GitHub Releases.",
+  "description": "DSH Desktop: Electron desktop shell for the DeepSeek Harness (dsh) webserver, packaged for macOS, Windows, and Linux (Flatpak). Auto-updates from GitHub Releases.",
   "version": "0.1.1",
   "private": true,
   "author": "tduarte",

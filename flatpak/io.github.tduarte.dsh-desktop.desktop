@@ -1,13 +1,13 @@
 [Desktop Entry]
 Type=Application
-Name=DeepSeek Harness
+Name=DSH Desktop
 GenericName=AI Agent Harness
 Comment=Local-first AI agent harness with a desktop UI
 Exec=dsh-desktop %U
 Icon=io.github.tduarte.dsh-desktop
 Terminal=false
 StartupNotify=true
-StartupWMClass=DeepSeek Harness
+StartupWMClass=DSH Desktop
 Categories=Development;Utility;
 MimeType=x-scheme-handler/dsh;
 Keywords=ai;agent;harness;chat;dev;

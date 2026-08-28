@@ -70,13 +70,13 @@ jobs:
       - run: pnpm run icon:build
       - name: Build macOS .app
         # Manual pack bypasses electron-builder's OOMing nodeModulesCollector.
-        # Produces dist/DeepSeek Harness.app without invoking electron-builder.
+        # Produces dist/DSH Desktop.app without invoking electron-builder.
         run: pnpm run dist:mac
       - uses: actions/upload-artifact@v4
         with:
           name: dsh-desktop-mac
           path: |
-            dist/DeepSeek Harness.app
+            dist/DSH Desktop.app
             dist/*.dmg
             dist/latest-mac.yml
           if-no-files-found: error
@@ -109,7 +109,7 @@ jobs:
         with:
           name: dsh-desktop-win
           path: |
-            dist/DeepSeek-Harness-*-win-x64/**
+            dist/DSH-Desktop-*-win-x64/**
           retention-days: 14
 
   build-linux:
@@ -134,7 +134,7 @@ jobs:
       - run: pnpm run icon:build
       - name: Build Linux tarball
         # Manual pack bypasses electron-builder's OOMing nodeModulesCollector.
-        # Produces dist/DeepSeek-Harness-<version>-linux-x64.tar.gz.
+        # Produces dist/DSH-Desktop-<version>-linux-x64.tar.gz.
         run: pnpm run dist:linux
       - name: Install flatpak-builder (>= 1.4.4 from Flathub PPA)
         # Ubuntu 22.04 ships flatpak-builder 1.2.x, which calls the
@@ -162,7 +162,7 @@ jobs:
         with:
           name: dsh-desktop-linux
           path: |
-            build/flatpak-out/DeepSeek-Harness-*.flatpak
+            build/flatpak-out/DSH-Desktop-*.flatpak
             build/flatpak-out/repo.tar.gz
           if-no-files-found: error
           retention-days: 14
@@ -171,8 +171,7 @@ jobs:
     name: Publish GitHub Release
     # Runs on tag push AND on manual dispatch (workflow_dispatch). v0.1.1
     # is a manual-install pre-release:
-    #   - macOS: DeepSeek Harness.app (no .dmg, no latest-mac.yml)
-    #   - Windows: DeepSeek-Harness-0.1.1-win-x64/ directory (zipped)
+    #   - macOS: DSH Desktop.app (no .dmg, no latest-mac.yml)
     # Auto-update is not wired in this release; downstream releases
     # will switch to electron-builder NSIS + dmg with proper manifests.
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
@@ -203,12 +202,12 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          app=(DeepSeek\ Harness.app)
+          app=(DSH\ Desktop.app)
           if [ ! -d "${app[0]}" ]; then
-            echo "expected DeepSeek Harness.app in artifacts/mac" >&2
+            echo "expected DSH Desktop.app in artifacts/mac" >&2
             exit 1
           fi
-          zip -qry DeepSeek-Harness-mac.zip "${app[0]}"
+          zip -qry DSH-Desktop-mac.zip "${app[0]}"
       - name: Zip Windows directory
         # Updater-free v0.1.1: ship the directory as a zip so users have
         # a single download artifact. Renamed from the raw dist output.
@@ -216,7 +215,7 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          dir=(DeepSeek-Harness-*-win-x64)
+          dir=(DSH-Desktop-*-win-x64)
           if [ "${#dir[@]}" -ne 1 ]; then
             echo "expected exactly one win-x64 directory, got: ${dir[*]}" >&2
             exit 1
@@ -230,7 +229,7 @@ jobs:
           generate_release_notes: true
           prerelease: false
           files: |
-            artifacts/mac/DeepSeek-Harness-mac.zip
+            artifacts/mac/DSH-Desktop-mac.zip
             artifacts/win/*.zip
             artifacts/linux/*.flatpak
             artifacts/linux/repo.tar.gz

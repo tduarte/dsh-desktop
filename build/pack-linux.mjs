@@ -8,8 +8,8 @@
  * object). The collector is hardcoded: there is no env var or config key
  * to skip it in v26.x. Pivoting off electron-builder for Linux entirely.
  * Output:
- *   dist/DeepSeek-Harness-<version>-linux-x64.tar.gz
- *     - DeepSeek Harness-linux-x64/
+ *   dist/DSH-Desktop-<version>-linux-x64.tar.gz
+ *     - DSH Desktop-linux-x64/
  *       - electron-app/node_modules/electron/dist/
  *         - dsh-desktop         (Electron binary, renamed so app.isPackaged is true)
  *         - resources/app/      (package.json + lib/main.cjs + lib/preload.cjs)
@@ -39,7 +39,7 @@ const stageDshSource = join(stageRoot, 'dsh')
 const stageDistSource = join(stageRoot, 'dist')
 
 const version = (await import(join(repoRoot, 'package.json'), { with: { type: 'json' } })).default.version
-const tarballName = `DeepSeek-Harness-${version}-linux-x64.tar.gz`
+const tarballName = `DSH-Desktop-${version}-linux-x64.tar.gz`
 
 function fail(message) {
   process.stderr.write(`pack-linux: ${message}\n`)
@@ -55,7 +55,7 @@ async function main() {
   // Stage a layout Electron recognizes as "packaged": executable renamed
   // away from "electron" (app.isPackaged === true) and the app payload under
   // <exe_dir>/resources/, matching what electron-builder emits.
-  const stagingRoot = join(distDir, 'DeepSeek Harness-linux-x64')
+  const stagingRoot = join(distDir, 'DSH Desktop-linux-x64')
   if (existsSync(stagingRoot)) await rm(stagingRoot, { recursive: true, force: true })
   const electronDist = join(stagingRoot, 'electron-app', 'node_modules', 'electron', 'dist')
   await mkdir(join(electronDist, 'resources', 'app'), { recursive: true })
@@ -105,14 +105,14 @@ async function main() {
   const tarPath = join(distDir, tarballName)
   if (existsSync(tarPath)) await rm(tarPath, { force: true })
   // BSD tar (macOS) and GNU tar both accept `-czf <archive> -C <dir> <entry>`.
-  // The staging directory's literal name "DeepSeek Harness-linux-x64" is
+  // The staging directory's literal name "DSH Desktop-linux-x64" is
   // preserved inside the tarball; no --transform needed.
   await new Promise((resolveProm, rejectProm) => {
     const tar = spawn('tar', [
       '-czf',
       tarPath,
       '-C', distDir,
-      'DeepSeek Harness-linux-x64',
+      'DSH Desktop-linux-x64',
     ], { stdio: 'inherit' })
     tar.once('error', rejectProm)
     tar.once('close', (code) => {

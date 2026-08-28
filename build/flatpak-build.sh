@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Build a Flatpak bundle for DeepSeek Harness desktop.
+# Build a Flatpak bundle for DSH Desktop.
 #
 # Inputs:
 #   1. The prebuilt Electron archive (the `--tarball` argument) produced by
-#      `pnpm run dist:linux` (writes to `dist/DeepSeek-Harness-<version>-linux-x64.tar.gz`).
+#      `pnpm run dist:linux` (writes to `dist/DSH-Desktop-<version>-linux-x64.tar.gz`).
 #   2. `flatpak/io.github.tduarte.dsh-desktop.yml` — the Flatpak manifest.
 #
 # This script:
@@ -18,7 +18,7 @@
 # Env:
 #   VERSION                app version (default: package.json#version)
 #   FLATPAK_REPO           output repo dir (default: build/flatpak-out/repo)
-#   FLATPAK_BUNDLE         output .flatpak (default: build/flatpak-out/DeepSeek-Harness-<version>.flatpak)
+#   FLATPAK_BUNDLE         output .flatpak (default: build/flatpak-out/DSH-Desktop-<version>.flatpak)
 #   FLATPAK_USER_INSTALL   pass `1`/`true` to install deps into the user
 #                         flatpak install (default; required for non-root CI
 #                         runners). Pass `0`/`false` to install system-wide
@@ -29,10 +29,10 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_ID="io.github.tduarte.dsh-desktop"
 VERSION="${VERSION:-$(node -e "console.log(require('${REPO_ROOT}/package.json').version)")}"
 OUT_DIR="${OUT_DIR:-${REPO_ROOT}/build/flatpak-out}"
-TARBALL="${1:-${REPO_ROOT}/dist/DeepSeek-Harness-${VERSION}-linux-x64.tar.gz}"
+TARBALL="${1:-${REPO_ROOT}/dist/DSH-Desktop-${VERSION}-linux-x64.tar.gz}"
 FLATPAK_REPO="${FLATPAK_REPO:-${OUT_DIR}/repo}"
 FLATPAK_BUILD_DIR="${FLATPAK_BUILD_DIR:-${OUT_DIR}/build}"
-FLATPAK_BUNDLE="${FLATPAK_BUNDLE:-${OUT_DIR}/DeepSeek-Harness-${VERSION}.flatpak}"
+FLATPAK_BUNDLE="${FLATPAK_BUNDLE:-${OUT_DIR}/DSH-Desktop-${VERSION}.flatpak}"
 MANIFEST_SRC="${REPO_ROOT}/flatpak/${APP_ID}.yml"
 MANIFEST_RENDERED="${REPO_ROOT}/flatpak/${APP_ID}.rendered.yml"
 
